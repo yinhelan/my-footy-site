@@ -6,7 +6,6 @@ const style = `
   .btn{background:#111;color:#fff} .card{border:1px solid #eee;border-radius:12px;padding:14px}
   table{border-collapse:collapse;width:100%} td,th{border:1px solid #eee;padding:6px;text-align:center}
   h1{margin-bottom:8px}
-  .muted{color:#666}
 `;
 ---
 <html lang="en">
@@ -24,37 +23,6 @@ const style = `
     <h1>Poisson Scoreline & BTTS/OU Calculator</h1>
     <p>Tip: You can type <b>1.40</b> or even <b>１．４０ / 1,40</b> — the inputs will be normalized automatically.</p>
 
-    <!-- 估 λ 卡片（近 N 场） -->
-    <div class="card" id="lambdaCard" style="margin-bottom:12px">
-      <h3>Estimate λ from recent matches (quick)</h3>
-      <div class="row">
-        <div class="col">
-          <label>Home recent: GF / GA / matches</label>
-          <input id="hGF" type="text" inputmode="decimal" placeholder="e.g. 18">
-          <input id="hGA" type="text" inputmode="decimal" placeholder="e.g. 10">
-          <input id="hN"  type="text" inputmode="numeric"  placeholder="e.g. 10">
-        </div>
-        <div class="col">
-          <label>Away recent: GF / GA / matches</label>
-          <input id="aGF" type="text" inputmode="decimal" placeholder="e.g. 12">
-          <input id="aGA" type="text" inputmode="decimal" placeholder="e.g. 14">
-          <input id="aN"  type="text" inputmode="numeric"  placeholder="e.g. 10">
-        </div>
-        <div class="col">
-          <label>League avg goals (L) & home factor (h)</label>
-          <input id="Lavg" type="text" inputmode="decimal" value="2.60">
-          <input id="Hadv" type="text" inputmode="decimal" value="1.10">
-        </div>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button class="btn" id="estBtn">Estimate λ & fill below</button>
-        <button id="estAndCalcBtn">Apply & Calculate</button>
-        <div id="estOut" style="padding:8px 0 0 8px;color:#444"></div>
-      </div>
-      <p class="muted" style="margin-top:8px">λ_home = atk_home × def_away × (L/2) × h；λ_away = atk_away × def_home × (L/2) ÷ h</p>
-    </div>
-
-    <!-- 主计算器 -->
     <div class="card">
       <div class="row">
         <div class="col">
@@ -117,37 +85,6 @@ const style = `
         return Number.isFinite(num) ? num : fallback;
       }
 
-      // ---------- Lambda estimator ----------
-      function safeNum(id, fb=0){
-        const el = $(id); if(!el) return fb;
-        const v = normalizeNum(el.value);
-        const n = Number(v);
-        return Number.isFinite(n) ? n : fb;
-      }
-      function estimateLambda(applyOnly=false){
-        const hGF = safeNum('hGF'), hGA = safeNum('hGA'), hN = Math.max(1, Math.floor(safeNum('hN', 1)));
-        const aGF = safeNum('aGF'), aGA = safeNum('aGA'), aN = Math.max(1, Math.floor(safeNum('aN', 1)));
-        const L   = Math.max(0.5, safeNum('Lavg', 2.6));   // league avg total goals / match
-        const h   = Math.max(0.8, safeNum('Hadv', 1.10));  // home advantage factor
-
-        const perTeam = L / 2;
-        const atkH = (hGF / hN) / perTeam;
-        const defA = (aGA / aN) / perTeam;
-        const atkA = (aGF / aN) / perTeam;
-        const defH = (hGA / hN) / perTeam;
-
-        const lamH = Math.max(0, atkH * defA * perTeam * h);
-        const lamA = Math.max(0, atkA * defH * perTeam / h);
-
-        $('lamHome').value = lamH.toFixed(2);
-        $('lamAway').value = lamA.toFixed(2);
-
-        if(!applyOnly){
-          $('estOut').innerHTML = 'Estimated: λ_home = <b>'+lamH.toFixed(2)+'</b>, λ_away = <b>'+lamA.toFixed(2)+'</b>';
-        }
-        return {lamH, lamA};
-      }
-
       // ---------- Math ----------
       const factMemo = {0:1};
       function factorial(n){ if(factMemo[n]) return factMemo[n]; let r=1; for(let i=2;i<=n;i++) r*=i; factMemo[n]=r; return r; }
@@ -188,7 +125,7 @@ const style = `
           <p><b>BTTS</b>: ${pct(BTTS)}</p>
           <p><b>Over 2.5</b>: ${pct(over)}</p>
           <p><b>Under 2.5</b>: ${pct(under)}</p>
-          <p class="muted">Assumptions: independence; truncation at K=${kMax}</p>
+          <p style="color:#666">Assumptions: independence; truncation at K=${kMax}</p>
         `;
         $('top5').innerHTML = top5.map(t=>'<li>'+t.i+':'+t.j+' — '+pct(t.p)+'</li>').join('');
 
@@ -293,7 +230,6 @@ const style = `
         link.click();
       }
 
-      // URL 预填
       function bootstrapFromQuery(){
         const sp = new URLSearchParams(location.search);
         if(sp.size === 0) return;
@@ -308,10 +244,7 @@ const style = `
       }
       window.addEventListener('DOMContentLoaded', bootstrapFromQuery);
 
-      // 事件绑定
-      $('estBtn').addEventListener('click', ()=>estimateLambda(false));
-      $('estAndCalcBtn').addEventListener('click', ()=>{ estimateLambda(true); $('calcBtn').click(); });
-
+      // Bind
       $('calcBtn').addEventListener('click', compute);
       $('copyBtn').addEventListener('click', copySummary);
       $('csvBtn').addEventListener('click', exportCSV);
