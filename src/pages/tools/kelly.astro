@@ -1,0 +1,206 @@
+---
+const style = `
+  *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 260px} input{width:100%;padding:8px;border:1px solid #ccc;border-radius:10px}
+  button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;margin-right:8px}
+  .btn{background:#111;color:#fff}
+  .card{border:1px solid #eee;border-radius:12px;padding:14px}
+  h1{margin-bottom:8px} .muted{color:#666}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  @media(max-width:720px){ .grid{grid-template-columns:1fr} }
+  table{border-collapse:collapse;width:100%} td,th{border:1px solid #eee;padding:8px;text-align:center}
+`;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kelly Stake Calculator</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="canonical" href="https://my-footy-site.pages.dev/tools/kelly" />
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Kelly Stake Calculator","applicationCategory":"SportsApplication","operatingSystem":"Web","url":"https://my-footy-site.pages.dev/tools/kelly","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+    </script>
+    <style is:global set:html={style}></style>
+  </head>
+  <body style="font-family: system-ui; max-width: 960px; margin: 24px auto; padding: 0 16px;">
+
+    <h1>Kelly Stake Calculator</h1>
+    <p class="muted">输入你的<b>赔率</b>与<b>自估概率</b>，计算凯利比例与下注额。赔率支持 Decimal（2.10）、Fractional（13/10）、American（+120/-150）。概率可填 0.52 或 52%。</p>
+
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>Odds</label>
+          <input id="odds" type="text" inputmode="decimal" placeholder="e.g. 2.10 / 13/10 / +120" />
+        </div>
+        <div class="col">
+          <label>Win probability (p)</label>
+          <input id="prob" type="text" inputmode="decimal" placeholder="e.g. 0.52 or 52%" />
+        </div>
+        <div class="col">
+          <label>Bankroll</label>
+          <input id="bank" type="text" inputmode="decimal" placeholder="e.g. 1000" />
+        </div>
+        <div class="col">
+          <label>Stake cap (optional)</label>
+          <input id="cap" type="text" inputmode="decimal" placeholder="e.g. 200" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="calcBtn">Calculate</button>
+        <button id="copyBtn">Copy Summary</button>
+        <button id="shareBtn">Share link</button>
+      </div>
+    </div>
+
+    <div id="result" style="display:none; margin-top:16px">
+      <div class="grid">
+        <div class="card">
+          <h3>Recommended stakes</h3>
+          <table>
+            <thead><tr><th>Mode</th><th>Fraction</th><th>Stake</th></tr></thead>
+            <tbody>
+              <tr><td>Full Kelly</td><td id="f_full">-</td><td id="s_full">-</td></tr>
+              <tr><td>Half Kelly</td><td id="f_half">-</td><td id="s_half">-</td></tr>
+              <tr><td>Quarter Kelly</td><td id="f_quar">-</td><td id="s_quar">-</td></tr>
+            </tbody>
+          </table>
+          <p class="muted" style="margin-top:6px">负值表示无优势（不下注）。Stake 会应用上限（如填写）。</p>
+        </div>
+        <div class="card">
+          <h3>Edge & implieds</h3>
+          <div id="meta"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function normalize(s){
+        if(s==null) return '';
+        s = String(s).trim()
+          .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFF10+0x30))
+          .replace(/[，]/g, ',')
+          .replace(/[。．]/g, '.')
+          .replace(/\s+/g,'');
+        return s;
+      }
+      function parseDecimalOdds(str){
+        const s = normalize(str);
+        if(s === '') return NaN;
+        if(s.includes('/')){
+          const [a,b] = s.split('/');
+          const A = Number(a), B = Number(b);
+          if(!Number.isFinite(A) || !Number.isFinite(B) || B<=0) return NaN;
+          return A/B + 1;
+        }
+        if(/^[+-]\d+$/i.test(s)){
+          const n = Math.abs(parseInt(s,10));
+          return s[0] === '-' ? 1 + 100/n : 1 + n/100;
+        }
+        const d = Number(s.replace(',', '.'));
+        if(!Number.isFinite(d) || d<=1) return NaN;
+        return d;
+      }
+      function parseProb(str){
+        let s = normalize(str);
+        if(s.endsWith('%')) s = s.slice(0,-1);
+        const val = Number(s.replace(',', '.'));
+        if(!Number.isFinite(val)) return NaN;
+        return val > 1 ? val/100 : val;
+      }
+      const $ = (id)=>document.getElementById(id);
+      function money(n){ return Number.isFinite(n) ? '$'+n.toFixed(2) : '-'; }
+      function frac(n){ return Number.isFinite(n) ? (n*100).toFixed(2)+'%' : '-'; }
+
+      function calc(){
+        const d = parseDecimalOdds($('odds').value);
+        const p = parseProb($('prob').value);
+        const bank = Number(normalize($('bank').value).replace(',', '.'));
+        const cap = Number(normalize($('cap').value).replace(',', '.'));
+
+        if(!Number.isFinite(d) || !Number.isFinite(p) || !Number.isFinite(bank)){
+          alert('Please enter valid odds, probability and bankroll.');
+          return;
+        }
+        const b = d - 1;
+        const q = 1 - p;
+        let f = (b*p - q) / b; // Kelly fraction
+        if(!Number.isFinite(f)) f = 0;
+        const fClamped = Math.max(0, Math.min(1, f));
+
+        const stakeFull = Math.min(bank * fClamped, Number.isFinite(cap)&&cap>0 ? cap : Infinity);
+        const stakeHalf = Math.min(bank * (fClamped/2), Number.isFinite(cap)&&cap>0 ? cap : Infinity);
+        const stakeQuar = Math.min(bank * (fClamped/4), Number.isFinite(cap)&&cap>0 ? cap : Infinity);
+
+        $('f_full').textContent = frac(fClamped);
+        $('f_half').textContent = frac(fClamped/2);
+        $('f_quar').textContent = frac(fClamped/4);
+        $('s_full').textContent = money(stakeFull);
+        $('s_half').textContent = money(stakeHalf);
+        $('s_quar').textContent = money(stakeQuar);
+
+        const pImp = 1/d;
+        const edge = p - pImp;
+        const evPer1 = p*d - 1;
+        const text = [
+          'Decimal odds = '+d.toFixed(3),
+          'Implied prob (book) = '+(pImp*100).toFixed(2)+'%',
+          'Your prob (p) = '+(p*100).toFixed(2)+'%',
+          'Edge (p - 1/d) = '+(edge*100).toFixed(2)+'%',
+          'EV per $1 stake = '+evPer1.toFixed(3)
+        ].join('<br/>');
+        $('meta').innerHTML = text;
+
+        window.__kelly_state = {d,p,bank,cap,f:fClamped,stakeFull,stakeHalf,stakeQuar,edge,evPer1};
+        $('result').style.display = 'block';
+      }
+
+      function copySummary(){
+        const s = window.__kelly_state;
+        if(!s){ alert('Calculate first.'); return; }
+        const lines = [
+          'Kelly Summary',
+          'odds(dec)='+s.d.toFixed(3),
+          'p='+(s.p*100).toFixed(2)+'%',
+          'bankroll=$'+s.bank.toFixed(2),
+          'fullKelly='+ (s.f*100).toFixed(2)+'%',
+          'stake_full='+money(s.stakeFull),
+          'stake_half='+money(s.stakeHalf),
+          'stake_quarter='+money(s.stakeQuar),
+          'edge='+(s.edge*100).toFixed(2)+'%',
+          'EV_per_$1='+s.evPer1.toFixed(3)
+        ];
+        navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('Copied!'));
+      }
+
+      function shareLink(){
+        const params = new URLSearchParams();
+        params.set('odds', normalize($('odds').value));
+        params.set('p', normalize($('prob').value));
+        params.set('bank', normalize($('bank').value));
+        const capRaw = normalize($('cap').value);
+        if(capRaw) params.set('cap', capRaw);
+        params.set('autocalc','1');
+        const url = location.origin + location.pathname + '?' + params.toString();
+        navigator.clipboard.writeText(url).then(()=>alert('Link copied!'));
+      }
+
+      function fromQuery(){
+        const sp = new URLSearchParams(location.search);
+        if(sp.size===0) return;
+        const set = (id,val)=>{ if(val!=null && String(val).trim()!==''){ $(id).value = String(val).trim(); } };
+        set('odds', sp.get('odds'));
+        set('prob', sp.get('p'));
+        set('bank', sp.get('bank'));
+        set('cap', sp.get('cap'));
+        const auto = sp.get('autocalc');
+        if(auto==='1' || auto==='true'){ setTimeout(()=>$('calcBtn').click(), 0); }
+      }
+      window.addEventListener('DOMContentLoaded', fromQuery);
+
+      document.getElementById('calcBtn').addEventListener('click', calc);
+      document.getElementById('copyBtn').addEventListener('click', copySummary);
+      document.getElementById('shareBtn').addEventListener('click', shareLink);
+    </script>
+  </body>
+</html>
