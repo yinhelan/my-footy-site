@@ -1,0 +1,301 @@
+---
+const style = `
+  *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 260px} input,select{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px}
+  button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;margin-right:8px}
+  .btn{background:#111;color:#fff} .card{border:1px solid #eee;border-radius:12px;padding:14px}
+  table{border-collapse:collapse;width:100%} td,th{border:1px solid #eee;padding:6px;text-align:center;font-variant-numeric:tabular-nums}
+  h1{margin-bottom:8px}
+  .muted{color:#666}
+  .right{ text-align:right }
+`;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Implied Odds & Overround Remover</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="canonical" href="https://my-footy-site.vercel.app/tools/implied-odds" />
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Implied Odds & Overround Remover","applicationCategory":"SportsApplication","operatingSystem":"Web","url":"https://my-footy-site.vercel.app/tools/implied-odds","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+    </script>
+    <style is:global set:html={style}></style>
+  </head>
+  <body style="font-family: system-ui; max-width: 1000px; margin: 24px auto; padding: 0 16px;">
+
+    <h1>Implied Odds → Fair Odds (remove overround)</h1>
+    <p class="muted">输入赔率可用任意格式：Decimal（如 <b>2.10</b>）、Fractional（如 <b>13/10</b>）、American（如 <b>+120</b>、<b>-150</b>）。支持混合。</p>
+
+    <!-- 控件区 -->
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>Target margin (book overround) %</label>
+          <input id="marginPct" type="text" inputmode="decimal" value="0" />
+          <div class="muted" style="margin-top:4px">设为 0% 得到公平赔率（归一到 100%）；设为 5 表示目标总抽水 5%（总概率=105%）。</div>
+        </div>
+        <div class="col">
+          <label>Preset rows</label>
+          <div class="row">
+            <button id="preset2">2-way</button>
+            <button id="preset3">3-way (1X2)</button>
+            <button id="addRow">+ Add outcome</button>
+            <button id="removeRow">- Remove last</button>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="calcBtn">Calculate</button>
+        <button id="copyBtn">Copy Summary</button>
+        <button id="csvBtn">Export CSV</button>
+        <button id="shareBtn">Share link</button>
+      </div>
+    </div>
+
+    <!-- 结果表 -->
+    <div class="card" style="margin-top:12px">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th style="width:160px">Label</th>
+            <th style="width:180px">Input odds</th>
+            <th>Decimal</th>
+            <th>Implied %</th>
+            <th>Fair % (100%)</th>
+            <th>Fair Decimal</th>
+            <th>With margin %</th>
+            <th>With margin Decimal</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="right"><b>Sum</b></td>
+            <td id="sumImp">0.00%</td>
+            <td id="sumFair">100.00%</td>
+            <td></td>
+            <td id="sumMar">0.00%</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <script>
+      // --------- Helpers ----------
+      function normalize(s){
+        if(s==null) return '';
+        s = String(s).trim()
+          .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFF10+0x30)) // 全角数字→半角
+          .replace(/[，]/g, ',')    // 中文逗号→英文逗号（保留逗号，不参与解析）
+          .replace(/[。．]/g, '.')  // 中文句号→.
+          .replace(/[\s]+/g,'');
+        return s;
+      }
+      function parseDecimalOdds(str){
+        const s = normalize(str);
+        if(s === '') return NaN;
+
+        // Fractional: a/b
+        if(s.includes('/')){
+          const parts = s.split('/');
+          if(parts.length!==2) return NaN;
+          const a = Number(parts[0]); const b = Number(parts[1]);
+          if(!Number.isFinite(a) || !Number.isFinite(b) || b<=0) return NaN;
+          return a/b + 1;
+        }
+        // American: +120 or -150
+        if(/^[+-]\d+$/i.test(s)){
+          const n = Math.abs(parseInt(s,10));
+          if(s[0]==='+' || s[0]==='+'){ return 1 + n/100; }
+          if(s[0]==='-'){ return 1 + 100/n; }
+        }
+        // Decimal
+        const d = Number(s.replace(',', '.')); // 容错 1,90 → 1.90
+        if(!Number.isFinite(d) || d<=1) return NaN; // 小于等于1不合理
+        return d;
+      }
+      function pct(x){ return (x*100).toFixed(2)+'%'; }
+      function dec(x){ return Number.isFinite(x) ? x.toFixed(3) : '-'; }
+      function readMargin(){
+        const s = normalize(document.getElementById('marginPct').value||'');
+        const n = Number(s.replace(',', '.'));
+        return Number.isFinite(n) ? Math.max(-50, Math.min(100, n)) : 0; // 容错
+      }
+
+      // --------- Rows (DOM) ----------
+      const rowsEl = document.getElementById('rows');
+      function addRow(label, odds){
+        const idx = rowsEl.children.length + 1;
+        const tr = document.createElement('tr');
+        tr.className = 'outcome';
+        tr.innerHTML =
+          '<td><input class="lbl" type="text" value="'+(label||('Outcome '+idx))+'" /></td>'+
+          '<td><input class="odds" type="text" placeholder="2.10 / 13/10 / +120" value="'+(odds||'')+'" /></td>'+
+          '<td class="dec">-</td>'+
+          '<td class="imp">-</td>'+
+          '<td class="fairp">-</td>'+
+          '<td class="fairo">-</td>'+
+          '<td class="marp">-</td>'+
+          '<td class="maro">-</td>';
+        rowsEl.appendChild(tr);
+      }
+      function removeRow(){ if(rowsEl.children.length>1) rowsEl.removeChild(rowsEl.lastElementChild); }
+      function preset(n){
+        rowsEl.innerHTML = '';
+        if(n===2){ addRow('Home',''); addRow('Away',''); }
+        else { addRow('Home',''); addRow('Draw',''); addRow('Away',''); }
+      }
+
+      // --------- Core calc ----------
+      function calculate(){
+        const trs = Array.from(rowsEl.querySelectorAll('tr.outcome'));
+        const decs = [];
+        const labels = [];
+        trs.forEach(tr=>{
+          const lbl = tr.querySelector('input.lbl').value||'Outcome';
+          const raw = tr.querySelector('input.odds').value||'';
+          const d = parseDecimalOdds(raw);
+          labels.push(lbl);
+          decs.push(d);
+        });
+
+        const imps = decs.map(d => Number.isFinite(d) ? 1/d : NaN);
+        const sumImp = imps.reduce((a,b)=> a + (Number.isFinite(b)?b:0), 0);
+
+        // 公平概率（归一到 1）
+        const fairs = imps.map(p => Number.isFinite(p) && sumImp>0 ? p/sumImp : NaN);
+        // 目标抽水：总概率 = 1 + m
+        const m = readMargin()/100;
+        const t = 1 + m;
+        const withMargin = fairs.map(q => Number.isFinite(q) ? q * t : NaN);
+
+        // 写回表格
+        let sumFair = 0, sumMar = 0;
+        trs.forEach((tr,i)=>{
+          const decCell = tr.querySelector('.dec');
+          const impCell = tr.querySelector('.imp');
+          const fairpCell = tr.querySelector('.fairp');
+          const fairoCell = tr.querySelector('.fairo');
+          const marpCell = tr.querySelector('.marp');
+          const maroCell = tr.querySelector('.maro');
+
+          const d = decs[i], p = imps[i], q = fairs[i], pm = withMargin[i];
+          decCell.textContent = dec(d);
+          impCell.textContent = Number.isFinite(p) ? pct(p) : '-';
+
+          if(Number.isFinite(q)){ sumFair += q; fairpCell.textContent = pct(q); fairoCell.textContent = (1/q).toFixed(3); }
+          else { fairpCell.textContent='-'; fairoCell.textContent='-'; }
+
+          if(Number.isFinite(pm)){ sumMar += pm; marpCell.textContent = pct(pm); maroCell.textContent = (1/pm).toFixed(3); }
+          else { marpCell.textContent='-'; maroCell.textContent='-'; }
+        });
+        document.getElementById('sumImp').textContent = pct(sumImp);
+        document.getElementById('sumFair').textContent = pct(1); // 恒为100%
+        document.getElementById('sumMar').textContent = pct(sumMar);
+
+        // 保存状态用于导出/分享
+        window.__odds_state = { labels, decs, imps, fairs, withMargin, marginPct: readMargin(), sumImp, sumMar };
+      }
+
+      // --------- Copy / CSV / Share ----------
+      function copySummary(){
+        const s = window.__odds_state;
+        if(!s){ alert('Calculate first.'); return; }
+        const lines = [];
+        lines.push('Implied Odds Summary');
+        lines.push('Overround (sum implied) = '+ (s.sumImp*100).toFixed(2)+'%');
+        lines.push('Target margin = '+ s.marginPct.toFixed(2) + '%  (sum with margin = '+ (s.sumMar*100).toFixed(2) +'%)');
+        for(let i=0;i<s.labels.length;i++){
+          const name = s.labels[i] || ('Outcome '+(i+1));
+          const d = s.decs[i];
+          const p = s.imps[i];
+          const q = s.fairs[i];
+          const pm = s.withMargin[i];
+          lines.push(
+            name+': input dec='+(Number.isFinite(d)?d.toFixed(3):'-')
+            +', implied='+(Number.isFinite(p)?(p*100).toFixed(2)+'%':'-')
+            +', fair='+(Number.isFinite(q)?(q*100).toFixed(2)+'% / '+(1/q).toFixed(3):'-')
+            +', withMargin='+(Number.isFinite(pm)?(pm*100).toFixed(2)+'% / '+(1/pm).toFixed(3):'-')
+          );
+        }
+        navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('Copied!'));
+      }
+
+      function exportCSV(){
+        const s = window.__odds_state;
+        if(!s){ alert('Calculate first.'); return; }
+        let csv = 'label,input_decimal,implied_prob,fair_prob,fair_decimal,with_margin_prob,with_margin_decimal\\n';
+        for(let i=0;i<s.labels.length;i++){
+          const name = s.labels[i] || ('Outcome '+(i+1));
+          const d  = Number.isFinite(s.decs[i]) ? s.decs[i].toFixed(6) : '';
+          const p  = Number.isFinite(s.imps[i]) ? s.imps[i].toFixed(6) : '';
+          const q  = Number.isFinite(s.fairs[i]) ? s.fairs[i].toFixed(6) : '';
+          const fq = Number.isFinite(s.fairs[i]) ? (1/s.fairs[i]).toFixed(6) : '';
+          const pm = Number.isFinite(s.withMargin[i]) ? s.withMargin[i].toFixed(6) : '';
+          const fm = Number.isFinite(s.withMargin[i]) ? (1/s.withMargin[i]).toFixed(6) : '';
+          csv += [name, d, p, q, fq, pm, fm].join(',') + '\\n';
+        }
+        const blob = new Blob([csv], {type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'implied_odds.csv'; a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      // odds=2.10;+120;13/10  labels=Home;Draw;Away  m=5
+      function shareLink(){
+        const trs = Array.from(rowsEl.querySelectorAll('tr.outcome'));
+        const rawOdds = trs.map(tr => (tr.querySelector('input.odds').value||'').trim());
+        const labels = trs.map(tr => (tr.querySelector('input.lbl').value||'').trim());
+        const m = readMargin();
+
+        const params = new URLSearchParams();
+        params.set('odds', rawOdds.join(';'));
+        params.set('labels', labels.join(';'));
+        params.set('m', String(m));
+        params.set('autocalc','1');
+
+        const url = location.origin + location.pathname + '?' + params.toString();
+        navigator.clipboard.writeText(url).then(()=>alert('Link copied!'));
+      }
+
+      // --------- Bootstrap & events ----------
+      function loadFromQuery(){
+        const sp = new URLSearchParams(location.search);
+        if(sp.size===0){ preset(3); return; }
+
+        const oddsStr = sp.get('odds') || '';
+        const lblStr  = sp.get('labels') || '';
+        const m = sp.get('m');
+        if(m!=null && m!==''){ document.getElementById('marginPct').value = m; }
+
+        const oList = oddsStr.split(';').map(s=>s.trim()).filter(s=>s!=='');
+        const lList = lblStr.split(';').map(s=>s.trim());
+
+        rowsEl.innerHTML = '';
+        if(oList.length>0){
+          for(let i=0;i<oList.length;i++){
+            addRow(lList[i] || ('Outcome '+(i+1)), oList[i]);
+          }
+        }else{
+          preset(3);
+        }
+        const auto = sp.get('autocalc');
+        if(auto==='1' || auto==='true'){ setTimeout(calculate, 0); }
+      }
+
+      document.getElementById('calcBtn').addEventListener('click', calculate);
+      document.getElementById('copyBtn').addEventListener('click', copySummary);
+      document.getElementById('csvBtn').addEventListener('click', exportCSV);
+      document.getElementById('shareBtn').addEventListener('click', shareLink);
+
+      document.getElementById('preset2').addEventListener('click', ()=>preset(2));
+      document.getElementById('preset3').addEventListener('click', ()=>preset(3));
+      document.getElementById('addRow').addEventListener('click', ()=>addRow());
+      document.getElementById('removeRow').addEventListener('click', removeRow);
+
+      window.addEventListener('DOMContentLoaded', loadFromQuery);
+    </script>
+  </body>
+</html>
