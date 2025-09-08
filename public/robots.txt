@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://my-footy-site.vercel.app/sitemap-index.xml
