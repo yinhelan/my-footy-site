@@ -1,0 +1,14 @@
+---
+const posts = [
+  { href: "/articles/poisson-football-basics", title: "Poisson distribution for football goals (Beginner)" },
+];
+---
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Articles</title></head>
+  <body style="font-family: system-ui; max-width: 900px; margin: 24px auto; padding: 0 16px;">
+    <h1>Articles</h1>
+    <ol>
+      {posts.map(p => <li><a href={p.href}>{p.title}</a></li>)}
+    </ol>
+  </body>
+</html>

@@ -1,16 +1,17 @@
 ---
-
+const title = "Football Analytics Starter";
 ---
-
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>{title}</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+  </head>
+  <body style="font-family: system-ui; max-width: 900px; margin: 24px auto; padding: 0 16px;">
+    <h1>{title}</h1>
+    <ul>
+      <li><a href="/articles/">Articles</a></li>
+      <li><a href="/tools/poisson">Poisson Scoreline & BTTS/OU Calculator</a></li>
+    </ul>
+  </body>
 </html>
