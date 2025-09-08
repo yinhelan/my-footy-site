@@ -1,5 +1,7 @@
 ---
+layout: ../../layouts/PostLayout.astro
 title: Poisson distribution for football goals
+---
 ---
 
 ## What problem Poisson solves

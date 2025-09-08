@@ -1,7 +1,9 @@
 ---
+layout: ../../layouts/PostLayout.astro
 title: Welcome to Footy Analytics
 description: What this site is about and how to use the tools.
 date: 2025-09-09
+tags: [intro]
 ---
 
 This site shares simple, practical football analytics tools and notes:
