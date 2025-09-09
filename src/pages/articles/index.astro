@@ -1,4 +1,5 @@
 ---
+import Breadcrumb from "../../components/jsonld/Breadcrumb.astro";
 import HeadBlock from "../../components/HeadBlock.astro";
 import Analytics from "../../components/Analytics.astro";
 /** 文章索引页：日期倒序 + 摘要 + 阅读时长 + 搜索 + 标签筛选 */
@@ -72,6 +73,10 @@ const style = `
     <Analytics />
   <HeadBlock kind="website" title="Articles — Footy Analytics" description="足球数据与投注模型的实践笔记与教程合集。" />
   <HeadBlock kind="website" title="Articles — Footy Analytics" description="足球数据与投注模型的实践笔记与教程合集。" />
+  <Breadcrumb items={[
+    { name: "Home", url: new URL("/", Astro.site).toString() },
+    { name: "Articles", url: new URL("/articles/", Astro.site).toString() }
+  ]} />
 </head>
   <body>
     <header>

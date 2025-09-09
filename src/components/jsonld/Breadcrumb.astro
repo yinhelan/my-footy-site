@@ -1,0 +1,18 @@
+---
+interface Crumb { name: string; url: string; }
+interface Props { items: Crumb[]; }
+const items = Astro.props.items || [];
+const list = items.map((it, i)=>({
+  "@type":"ListItem",
+  "position": i+1,
+  "name": it.name,
+  "item": it.url
+}));
+---
+{items.length>0 && (
+  <script type="application/ld+json">{JSON.stringify({
+    "@context":"https://schema.org",
+    "@type":"BreadcrumbList",
+    "itemListElement": list
+  })}</script>
+)}

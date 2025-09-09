@@ -6,13 +6,15 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "prebuild": "node scripts/gen-og.mjs"
   },
   "dependencies": {
     "astro": "^5.13.5"
   },
   "devDependencies": {
     "@astrojs/rss": "^4.0.12",
-    "@astrojs/sitemap": "^3.5.1"
+    "@astrojs/sitemap": "^3.5.1",
+    "@resvg/resvg-js": "^2.6.2"
   }
 }

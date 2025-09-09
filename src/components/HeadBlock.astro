@@ -26,11 +26,11 @@ const canon = canonical ?? new URL(Astro.url.pathname, Astro.site).toString();
 ---
 {kind === 'article'
  ? <>
-     <HeadMeta type="article" title={title} description={description} image={image} canonical={canon} datePublished={datePublished} dateModified={dateModified} />
+     <HeadMeta type="article" title={title} description={description} image={image || fallbackImg} canonical={canon} datePublished={datePublished} dateModified={dateModified} />
      <ArticleLD headline={title} description={description} image={image} canonical={canon} datePublished={datePublished} dateModified={dateModified} />
    </>
  : <>
-     <HeadMeta type="website" title={title} description={description} image={image} canonical={canon} />
+     <HeadMeta type="website" title={title} description={description} image={image || fallbackImg} canonical={canon} />
      <WebsiteLD />
    </>
 }
