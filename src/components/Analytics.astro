@@ -1,0 +1,46 @@
+---
+const UMAMI_ID  = import.meta.env.PUBLIC_UMAMI_WEBSITE_ID;
+const UMAMI_SRC = import.meta.env.PUBLIC_UMAMI_SCRIPT_SRC || 'https://us.umami.is/script.js';
+const GA4_ID    = (import.meta.env.PUBLIC_GA4_ID && import.meta.env.PUBLIC_GA4_ID.trim()) || 'G-184RY50MWX';
+---
+{UMAMI_ID && <script async defer data-website-id={UMAMI_ID} src={UMAMI_SRC}></script>}
+{GA4_ID && (
+  <>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}></script>
+    <script>{`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date()); gtag('config','${GA4_ID}');`}</script>
+  </>
+)}
+<script>
+(function(){
+  function send(name, params){
+    try{
+      if(window.umami && typeof window.umami.track === 'function'){ window.umami.track(name, params); return; }
+      if(window.gtag){ window.gtag('event', name, params||{}); }
+    }catch(e){}
+  }
+  function bind(id, event, name){
+    var el=document.getElementById(id); if(!el) return;
+    el.addEventListener(event, function(){ send(name, {path: location.pathname}); });
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    var p = location.pathname;
+    if(p.startsWith('/tools/poisson')){
+      bind('calcBtn','click','poisson_calc');
+      bind('copyBtn','click','poisson_copy');
+      bind('csvBtn','click','poisson_csv');
+      bind('shareBtn','click','poisson_share');
+      bind('pngBtn','click','poisson_png');
+    }else if(p.startsWith('/tools/implied-odds')){
+      bind('calcBtn','click','implied_calc');
+      bind('copyBtn','click','implied_copy');
+      bind('csvBtn','click','implied_csv');
+      bind('shareBtn','click','implied_share');
+    }else if(p.startsWith('/tools/kelly')){
+      bind('calcBtn','click','kelly_calc');
+      bind('copyBtn','click','kelly_copy');
+      bind('shareBtn','click','kelly_share');
+    }
+  });
+})();
+</script>

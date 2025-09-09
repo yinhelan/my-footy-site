@@ -1,4 +1,5 @@
 ---
+import Analytics from "../../components/Analytics.astro";
 const style = `
   *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
   .col{flex:1 1 260px} input{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px}
@@ -19,7 +20,8 @@ const style = `
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Football Poisson Scoreline Calculator","applicationCategory":"SportsApplication","operatingSystem":"Web","url":"https://my-footy-site.vercel.app/tools/poisson","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
     </script>
     <style is:global set:html={style}></style>
-  </head>
+    <Analytics />
+</head>
   <body style="font-family: system-ui; max-width: 960px; margin: 24px auto; padding: 0 16px;">
     <h1>Poisson Scoreline & BTTS/OU Calculator</h1>
     <p>Tip: You can type <b>1.40</b> or even <b>１．４０ / 1,40</b> — the inputs will be normalized automatically.</p>
