@@ -18,3 +18,26 @@ Assume independence; multiply two teams' goal distributions to get P(i,j).
 
 ## Next
 Try the calculator: [/tools/poisson](/tools/poisson)
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Poisson for Football: Basics",
+  "datePublished": "2025-09-05",
+  "author": { "@type": "Person", "name": "Footy Analytics" },
+  "mainEntityOfPage": "https://my-footy-site.pages.dev/articles/poisson-football-basics/"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"BreadcrumbList",
+  "itemListElement":[
+    { "@type":"ListItem","position":1,"name":"Home","item":"https://my-footy-site.pages.dev/" },
+    { "@type":"ListItem","position":2,"name":"Articles","item":"https://my-footy-site.pages.dev/articles/" },
+    { "@type":"ListItem","position":3,"name":"Poisson for Football: Basics","item":"https://my-footy-site.pages.dev/articles/poisson-football-basics/" }
+  ]
+}
+</script>
