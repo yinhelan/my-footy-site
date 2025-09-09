@@ -1,9 +1,8 @@
 ---
-import Analytics from "./Analytics.astro";
-import Analytics from "./Analytics.astro";
 import HeadMeta   from "./HeadMeta.astro";
 import WebsiteLD  from "./jsonld/Website.astro";
 import ArticleLD  from "./jsonld/Article.astro";
+import Analytics  from "./Analytics.astro";
 
 interface Props {
   kind?: 'website' | 'article';
@@ -25,16 +24,16 @@ const {
 } = Astro.props;
 
 const canon = canonical ?? new URL(Astro.url.pathname, Astro.site).toString();
+const fallbackImg = '/og/default.png';
 ---
 {kind === 'article'
  ? <>
      <HeadMeta type="article" title={title} description={description} image={image || fallbackImg} canonical={canon} datePublished={datePublished} dateModified={dateModified} />
-     <ArticleLD headline={title} description={description} image={image} canonical={canon} datePublished={datePublished} dateModified={dateModified} />
+     <ArticleLD headline={title} description={description} image={image || fallbackImg} canonical={canon} datePublished={datePublished} dateModified={dateModified} />
    </>
  : <>
      <HeadMeta type="website" title={title} description={description} image={image || fallbackImg} canonical={canon} />
      <WebsiteLD />
    </>
 }
-
 <Analytics />

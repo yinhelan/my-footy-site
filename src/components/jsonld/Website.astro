@@ -1,11 +1,14 @@
 ---
-interface Props { name?: string; url?: string; }
-const name = Astro.props.name ?? 'Footy Analytics';
-const url = Astro.props.url ?? (Astro.site?.toString() ?? '');
+interface Props { name?: string; url?: string; description?: string; image?: string; }
+const siteBase = Astro.site ? Astro.site.toString() : 'https://my-footy-site.pages.dev/';
+const data = {
+  "@context": "https://schema.org", "@type": "WebSite",
+  "name": Astro.props.name || "Footy Analytics",
+  "url":  Astro.props.url  || siteBase,
+  "description": Astro.props.description || "Simple football analytics tools and notes",
+  "inLanguage": "en",
+  "publisher": { "@type": "Organization", "name": "Footy Analytics", "url": siteBase }
+};
+const json = JSON.stringify(data);
 ---
-<script type="application/ld+json">{JSON.stringify({
-  "@context":"https://schema.org",
-  "@type":"WebSite",
-  "name": name,
-  "url": url
-})}</script>
+<script type="application/ld+json">{json}</script>

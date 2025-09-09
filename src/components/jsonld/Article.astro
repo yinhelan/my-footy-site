@@ -1,25 +1,17 @@
 ---
 interface Props {
-  headline: string;
-  description?: string;
-  authorName?: string;
-  image?: string;
-  datePublished?: string;
-  dateModified?: string;
-  canonical?: string;
+  headline: string; description?: string; image?: string;
+  canonical?: string; datePublished?: string; dateModified?: string;
 }
-const {headline, description, authorName = 'Footy Analytics', image, datePublished, dateModified} = Astro.props;
-const canonical = Astro.props.canonical ?? new URL(Astro.url.pathname, Astro.site).toString();
+const url = Astro.props.canonical || new URL(Astro.url.pathname, Astro.site).toString();
+const img = Astro.props.image ? new URL(Astro.props.image, Astro.site).toString() : undefined;
+const data = {
+  "@context": "https://schema.org", "@type": "Article",
+  "headline": Astro.props.headline, "description": Astro.props.description || "",
+  "image": img, "url": url, "mainEntityOfPage": url,
+  "datePublished": Astro.props.datePublished || undefined,
+  "dateModified": Astro.props.dateModified || Astro.props.datePublished || undefined
+};
+const json = JSON.stringify(data);
 ---
-<script type="application/ld+json">{JSON.stringify({
-  "@context":"https://schema.org",
-  "@type":"Article",
-  "mainEntityOfPage": {"@type":"WebPage","@id": canonical},
-  "headline": headline,
-  ...(description ? {"description": description} : {}),
-  ...(image ? {"image": [image]} : {}),
-  "author": {"@type":"Person","name": authorName},
-  ...(datePublished ? {"datePublished": datePublished} : {}),
-  ...(dateModified  ? {"dateModified" : dateModified } : {}),
-  "publisher": {"@type":"Organization","name":"Footy Analytics"}
-})}</script>
+<script type="application/ld+json">{json}</script>
