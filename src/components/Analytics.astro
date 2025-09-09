@@ -1,7 +1,7 @@
 ---
 const UMAMI_ID  = import.meta.env.PUBLIC_UMAMI_WEBSITE_ID;
 const UMAMI_SRC = import.meta.env.PUBLIC_UMAMI_SCRIPT_SRC || 'https://us.umami.is/script.js';
-const GA4_ID    = (import.meta.env.PUBLIC_GA4_ID && import.meta.env.PUBLIC_GA4_ID.trim()) || 'G-184RY50MWX';
+const GA4_ID    = (import.meta.env.PUBLIC_GA4_ID && import.meta.env.PUBLIC_GA4_ID.trim()) || 'G-YPZQKGD20M';
 ---
 {UMAMI_ID && <script async defer data-website-id={UMAMI_ID} src={UMAMI_SRC}></script>}
 {GA4_ID && (
