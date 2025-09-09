@@ -1,0 +1,328 @@
+---
+import Analytics from "../../components/Analytics.astro";
+const style = `
+  *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 260px} input{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px}
+  button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;margin-right:8px}
+  .btn{background:#111;color:#fff} .card{border:1px solid #eee;border-radius:12px;padding:14px}
+  table{border-collapse:collapse;width:100%} td,th{border:1px solid #eee;padding:6px;text-align:center}
+  h1{margin-bottom:8px}
+  .muted{color:#666}
+`;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Poisson Scoreline (v2)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="canonical" href="https://my-footy-site.vercel.app/tools/poisson" />
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Football Poisson Scoreline Calculator","applicationCategory":"SportsApplication","operatingSystem":"Web","url":"https://my-footy-site.vercel.app/tools/poisson","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+    </script>
+    <style is:global set:html={style}></style>
+    <Analytics />
+  <meta name="x-poisson-check" content="G-YPZQKGD20M">
+  <meta name="x-poisson-check" content="G-YPZQKGD20M">
+</head>
+  <body style="font-family: system-ui; max-width: 960px; margin: 24px auto; padding: 0 16px;">
+    <h1>Poisson Scoreline (v2)</h1>
+    <p>Tip: You can type <b>1.40</b> or even <b>１．４０ / 1,40</b> — the inputs will be normalized automatically.</p>
+
+    <!-- 估 λ 卡片（近 N 场） -->
+    <div class="card" id="lambdaCard" style="margin-bottom:12px">
+      <h3>Estimate λ from recent matches (quick)</h3>
+      <div class="row">
+        <div class="col">
+          <label>Home recent: GF / GA / matches</label>
+          <input id="hGF" type="text" inputmode="decimal" placeholder="e.g. 18">
+          <input id="hGA" type="text" inputmode="decimal" placeholder="e.g. 10">
+          <input id="hN"  type="text" inputmode="numeric"  placeholder="e.g. 10">
+        </div>
+        <div class="col">
+          <label>Away recent: GF / GA / matches</label>
+          <input id="aGF" type="text" inputmode="decimal" placeholder="e.g. 12">
+          <input id="aGA" type="text" inputmode="decimal" placeholder="e.g. 14">
+          <input id="aN"  type="text" inputmode="numeric"  placeholder="e.g. 10">
+        </div>
+        <div class="col">
+          <label>League avg goals (L) & home factor (h)</label>
+          <input id="Lavg" type="text" inputmode="decimal" value="2.60">
+          <input id="Hadv" type="text" inputmode="decimal" value="1.10">
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="estBtn">Estimate λ & fill below</button>
+        <button id="estAndCalcBtn">Apply & Calculate</button>
+        <div id="estOut" style="padding:8px 0 0 8px;color:#444"></div>
+      </div>
+      <p class="muted" style="margin-top:8px">λ_home = atk_home × def_away × (L/2) × h；λ_away = atk_away × def_home × (L/2) ÷ h</p>
+    </div>
+
+    <!-- 主计算器 -->
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>λ (Home)</label>
+          <input id="lamHome" type="text" inputmode="decimal" value="1.40" />
+        </div>
+        <div class="col">
+          <label>λ (Away)</label>
+          <input id="lamAway" type="text" inputmode="decimal" value="1.10" />
+        </div>
+        <div class="col">
+          <label>Max goals (0..K)</label>
+          <input id="kMax" type="text" inputmode="numeric" value="6" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="calcBtn">Calculate</button>
+        <button id="copyBtn">Copy Summary</button>
+        <button id="csvBtn">Export CSV</button>
+        <button id="shareBtn">Share link</button>
+        <button id="pngBtn">Export PNG</button>
+      </div>
+    </div>
+
+    <div id="result" style="margin-top:16px; display:none">
+      <div class="row">
+        <div class="col card">
+          <h3>Overview</h3>
+          <div id="overview"></div>
+        </div>
+        <div class="col card">
+          <h3>Top 5 Scorelines</h3>
+          <ol id="top5"></ol>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Full Score Matrix</h3>
+        <div id="matrix"></div>
+      </div>
+    </div>
+
+    <script>
+      // ---------- Utilities ----------
+      function normalizeNum(s){
+        if(!s) return '';
+        s = String(s).trim()
+          .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFF10 + 0x30))
+          .replace(/[。．]/g, '.')
+          .replace(/[，,]/g, '.')
+          .replace(/[^0-9.\-]/g, '');
+        const i = s.indexOf('.');
+        if(i !== -1){ s = s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, ''); }
+        return s;
+      }
+      const $ = (id) => document.getElementById(id);
+      function readNumber(id, fallback = NaN){
+        const raw = $(id)?.value ?? '';
+        const norm = normalizeNum(raw);
+        const num = Number(norm);
+        return Number.isFinite(num) ? num : fallback;
+      }
+
+      // ---------- Lambda estimator ----------
+      function safeNum(id, fb=0){
+        const el = $(id); if(!el) return fb;
+        const v = normalizeNum(el.value);
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fb;
+      }
+      function estimateLambda(applyOnly=false){
+        const hGF = safeNum('hGF'), hGA = safeNum('hGA'), hN = Math.max(1, Math.floor(safeNum('hN', 1)));
+        const aGF = safeNum('aGF'), aGA = safeNum('aGA'), aN = Math.max(1, Math.floor(safeNum('aN', 1)));
+        const L   = Math.max(0.5, safeNum('Lavg', 2.6));   // league avg total goals / match
+        const h   = Math.max(0.8, safeNum('Hadv', 1.10));  // home advantage factor
+
+        const perTeam = L / 2;
+        const atkH = (hGF / hN) / perTeam;
+        const defA = (aGA / aN) / perTeam;
+        const atkA = (aGF / aN) / perTeam;
+        const defH = (hGA / hN) / perTeam;
+
+        const lamH = Math.max(0, atkH * defA * perTeam * h);
+        const lamA = Math.max(0, atkA * defH * perTeam / h);
+
+        $('lamHome').value = lamH.toFixed(2);
+        $('lamAway').value = lamA.toFixed(2);
+
+        if(!applyOnly){
+          $('estOut').innerHTML = 'Estimated: λ_home = <b>'+lamH.toFixed(2)+'</b>, λ_away = <b>'+lamA.toFixed(2)+'</b>';
+        }
+        return {lamH, lamA};
+      }
+
+      // ---------- Math ----------
+      const factMemo = {0:1};
+      function factorial(n){ if(factMemo[n]) return factMemo[n]; let r=1; for(let i=2;i<=n;i++) r*=i; factMemo[n]=r; return r; }
+      function pois(k, lam){ if(lam<=0 && k===0) return 1; if(lam<=0) return 0; return Math.exp(-lam) * Math.pow(lam, k) / factorial(k); }
+      function buildPmf(lam, kMax){ const arr=[]; for(let k=0;k<=kMax;k++) arr.push(pois(k, lam)); const s=arr.reduce((a,b)=>a+b,0); return s>0 ? arr.map(x=>x/s) : arr; }
+
+      // ---------- Compute & render ----------
+      function compute(){
+        let lamH = readNumber('lamHome'); if(!Number.isFinite(lamH)) { lamH = 1.40; $('lamHome').value = '1.40'; }
+        let lamA = readNumber('lamAway'); if(!Number.isFinite(lamA)) { lamA = 1.10; $('lamAway').value = '1.10'; }
+        let kMax = Math.floor(readNumber('kMax')); if(!Number.isFinite(kMax) || kMax < 1) { kMax = 6; $('kMax').value = '6'; }
+
+        if(lamH < 0 || lamA < 0){ alert('Please enter valid numbers (λ ≥ 0).'); return; }
+
+        const pmfH = buildPmf(lamH, kMax);
+        const pmfA = buildPmf(lamA, kMax);
+
+        const M = [];
+        for(let i=0;i<=kMax;i++){
+          const row=[];
+          for(let j=0;j<=kMax;j++){ row.push(pmfH[i]*pmfA[j]); }
+          M.push(row);
+        }
+
+        const sumRow0 = M[0].reduce((a,b)=>a+b,0);
+        let sumCol0 = 0; for(let i=0;i<=kMax;i++) sumCol0 += M[i][0];
+        const BTTS = 1 - (sumCol0 + sumRow0 - M[0][0]);
+
+        let over = 0;
+        for(let i=0;i<=kMax;i++){ for(let j=0;j<=kMax;j++){ if(i+j>=3) over += M[i][j]; } }
+        const under = 1 - over;
+
+        const flat=[]; for(let i=0;i<=kMax;i++){ for(let j=0;j<=kMax;j++){ flat.push({i,j,p:M[i][j]}); } }
+        flat.sort((a,b)=>b.p-a.p); const top5 = flat.slice(0,5);
+
+        const pct = (x)=> (x*100).toFixed(2) + '%';
+        $('overview').innerHTML = `
+          <p><b>BTTS</b>: ${pct(BTTS)}</p>
+          <p><b>Over 2.5</b>: ${pct(over)}</p>
+          <p><b>Under 2.5</b>: ${pct(under)}</p>
+          <p class="muted">Assumptions: independence; truncation at K=${kMax}</p>
+        `;
+        $('top5').innerHTML = top5.map(t=>'<li>'+t.i+':'+t.j+' — '+pct(t.p)+'</li>').join('');
+
+        // Matrix table
+        let html = '<table><thead><tr><th>H\\A</th>';
+        for(let j=0;j<=kMax;j++) html += '<th>'+j+'</th>';
+        html += '</tr></thead><tbody>';
+        for(let i=0;i<=kMax;i++){
+          html += '<tr><th>'+i+'</th>';
+          for(let j=0;j<=kMax;j++){
+            html += '<td>'+pct(M[i][j])+'</td>';
+          }
+          html += '</tr>';
+        }
+        html += '</tbody></table>';
+        $('matrix').innerHTML = html;
+
+        window.__lastResult = { lamH, lamA, kMax, BTTS, over, under, matrix: M, top5 };
+        $('result').style.display = 'block';
+      }
+
+      // ---------- Actions ----------
+      function copySummary(){
+        const r = window.__lastResult;
+        if(!r){ alert('Calculate first.'); return; }
+        const fmt = (x)=> (x*100).toFixed(2)+'%';
+        const top5Str = r.top5.map(t => (t.i + ':' + t.j + ' ' + fmt(t.p))).join(', ');
+        const text = [
+          'Poisson Summary',
+          'λ_home=' + r.lamH + ', λ_away=' + r.lamA + ', K=' + r.kMax,
+          'BTTS=' + fmt(r.BTTS) + ' | Over2.5=' + fmt(r.over) + ' | Under2.5=' + fmt(r.under),
+          'Top5: ' + top5Str
+        ].join('\n');
+        navigator.clipboard.writeText(text).then(()=>alert('Copied!'));
+      }
+
+      function exportCSV(){
+        const r = window.__lastResult;
+        if(!r){ alert('Calculate first.'); return; }
+        let csv = 'home,away,prob\\n';
+        for(let i=0;i<=r.kMax;i++){
+          for(let j=0;j<=r.kMax;j++){
+            csv += i+','+j+','+r.matrix[i][j].toFixed(6)+'\\n';
+          }
+        }
+        const blob = new Blob([csv], {type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'poisson_matrix.csv'; a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function shareLink(){
+        const norm = (s)=> normalizeNum(s||'');
+        const home = norm($('lamHome').value);
+        const away = norm($('lamAway').value);
+        const k    = norm($('kMax').value);
+        const params = new URLSearchParams({ home, away, k, autocalc: '1' });
+        const url = location.origin + location.pathname + '?' + params.toString();
+        navigator.clipboard.writeText(url).then(()=>alert('Link copied!'));
+      }
+
+      function exportMatrixPNG(){
+        const table = document.querySelector('#matrix table');
+        if(!table){ alert('Generate matrix first (Calculate).'); return; }
+
+        const rows = [...table.querySelectorAll('tr')].map(tr => [...tr.children].map(td => td.textContent.trim()));
+        const cellW = 90, cellH = 32, padX = 24, padY = 40;
+        const width  = padX*2 + cellW * rows[0].length;
+        const height = padY*2 + cellH * rows.length;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // background
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,width,height);
+
+        // title
+        ctx.fillStyle = '#111';
+        ctx.font = 'bold 16px system-ui, -apple-system, Segoe UI, Roboto';
+        ctx.fillText('Poisson Scoreline Matrix', padX, 22);
+
+        // grid + text
+        const startY = padY;
+        ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for(let r=0; r<rows.length; r++){
+          for(let c=0; c<rows[r].length; c++){
+            const x = padX + c*cellW;
+            const y = startY + r*cellH;
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.strokeRect(x, y, cellW, cellH);
+            ctx.fillStyle = '#111';
+            ctx.fillText(rows[r][c], x + cellW/2, y + cellH/2);
+          }
+        }
+
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = 'poisson_matrix.png';
+        link.click();
+      }
+
+      // URL 预填
+      function bootstrapFromQuery(){
+        const sp = new URLSearchParams(location.search);
+        if(sp.size === 0) return;
+        const setIfValid = (id, val)=>{ if(val!=null && String(val).trim()!==''){ $(id).value = String(val).trim(); } };
+        setIfValid('lamHome', sp.get('home'));
+        setIfValid('lamAway', sp.get('away'));
+        setIfValid('kMax',   sp.get('k'));
+        const auto = sp.get('autocalc');
+        if(auto === '1' || auto === 'true'){
+          setTimeout(()=>$('calcBtn')?.click(), 0);
+        }
+      }
+      window.addEventListener('DOMContentLoaded', bootstrapFromQuery);
+
+      // 事件绑定
+      $('estBtn').addEventListener('click', ()=>estimateLambda(false));
+      $('estAndCalcBtn').addEventListener('click', ()=>{ estimateLambda(true); $('calcBtn').click(); });
+
+      $('calcBtn').addEventListener('click', compute);
+      $('copyBtn').addEventListener('click', copySummary);
+      $('csvBtn').addEventListener('click', exportCSV);
+      $('shareBtn').addEventListener('click', shareLink);
+      $('pngBtn').addEventListener('click', exportMatrixPNG);
+    </script>
+  </body>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YPZQKGD20M"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-YPZQKGD20M');</script>
+</html>
