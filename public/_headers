@@ -1,8 +1,21 @@
-/*.html
-  Cache-Control: no-cache, must-revalidate
-
+# 产物资源：长缓存 + immutable
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
-
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
 /og/*
   Cache-Control: public, max-age=31536000, immutable
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+# 站点地图 / RSS：中等缓存
+/sitemap-index.xml
+  Cache-Control: public, max-age=600
+/rss.xml
+  Cache-Control: public, max-age=600
+
+# 页面：目录路径与 .html 统一走 no-cache
+/*
+  Cache-Control: no-cache, must-revalidate
