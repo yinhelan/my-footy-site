@@ -1,0 +1,25 @@
+---
+interface Props {
+  headline: string;
+  description?: string;
+  authorName?: string;
+  image?: string;
+  datePublished?: string;
+  dateModified?: string;
+  canonical?: string;
+}
+const {headline, description, authorName = 'Footy Analytics', image, datePublished, dateModified} = Astro.props;
+const canonical = Astro.props.canonical ?? new URL(Astro.url.pathname, Astro.site).toString();
+---
+<script type="application/ld+json">{JSON.stringify({
+  "@context":"https://schema.org",
+  "@type":"Article",
+  "mainEntityOfPage": {"@type":"WebPage","@id": canonical},
+  "headline": headline,
+  ...(description ? {"description": description} : {}),
+  ...(image ? {"image": [image]} : {}),
+  "author": {"@type":"Person","name": authorName},
+  ...(datePublished ? {"datePublished": datePublished} : {}),
+  ...(dateModified  ? {"dateModified" : dateModified } : {}),
+  "publisher": {"@type":"Organization","name":"Footy Analytics"}
+})}</script>

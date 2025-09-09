@@ -1,0 +1,11 @@
+---
+interface Props { name?: string; url?: string; }
+const name = Astro.props.name ?? 'Footy Analytics';
+const url = Astro.props.url ?? (Astro.site?.toString() ?? '');
+---
+<script type="application/ld+json">{JSON.stringify({
+  "@context":"https://schema.org",
+  "@type":"WebSite",
+  "name": name,
+  "url": url
+})}</script>

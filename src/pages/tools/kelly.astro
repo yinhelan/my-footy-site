@@ -1,4 +1,5 @@
 ---
+import HeadBlock from "../../components/HeadBlock.astro";
 import Analytics from "../../components/Analytics.astro";
 const style = `
   *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
@@ -23,6 +24,8 @@ const style = `
     </script>
     <style is:global set:html={style}></style>
     <Analytics />
+  <HeadBlock kind="website" title="Kelly Stake Calculator" description="输入赔率与自估胜率，计算凯利比例与三档下注额，附隐含概率与期望收益。" />
+  <HeadBlock kind="website" title="Kelly Stake Calculator" description="输入赔率与自估胜率，计算凯利比例与三档下注额，附隐含概率与期望收益。" />
 </head>
   <body style="font-family: system-ui; max-width: 960px; margin: 24px auto; padding: 0 16px;">
 

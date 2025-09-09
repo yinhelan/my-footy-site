@@ -1,4 +1,5 @@
 ---
+import HeadBlock from "../components/HeadBlock.astro";
 import Analytics from "../components/Analytics.astro";
 const title = "Football Analytics Starter";
 ---
@@ -9,6 +10,8 @@ const title = "Football Analytics Starter";
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="alternate" type="application/rss+xml" title="Footy Analytics RSS" href="/rss.xml" />
   <Analytics />
+  <HeadBlock kind="website" title="Footy Analytics — Simple football analytics tools & notes" description="Poisson 进球分布、隐含概率转公平赔率、凯利投注计算等实用工具与笔记。" />
+  <HeadBlock kind="website" title="Footy Analytics — Simple football analytics tools & notes" description="Poisson 进球分布、隐含概率转公平赔率、凯利投注计算等实用工具与笔记。" />
 </head>
   <body style="font-family: system-ui; max-width: 900px; margin: 24px auto; padding: 0 16px;">
     <h1>{title}</h1>

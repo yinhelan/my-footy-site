@@ -1,4 +1,5 @@
 ---
+import HeadBlock from "../../components/HeadBlock.astro";
 import Analytics from "../../components/Analytics.astro";
 const style = `
   *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
@@ -22,6 +23,8 @@ const style = `
     </script>
     <style is:global set:html={style}></style>
     <Analytics />
+  <HeadBlock kind="website" title="Implied → Fair Odds (Overround Remover)" description="把 1X2/两方盘的混合赔率转换为隐含概率，归一为 100% 得到公平赔率，或设置总抽水目标。" />
+  <HeadBlock kind="website" title="Implied → Fair Odds (Overround Remover)" description="把 1X2/两方盘的混合赔率转换为隐含概率，归一为 100% 得到公平赔率，或设置总抽水目标。" />
 </head>
   <body style="font-family: system-ui; max-width: 1000px; margin: 24px auto; padding: 0 16px;">
 

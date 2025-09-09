@@ -1,4 +1,5 @@
 ---
+import HeadBlock from "../../components/HeadBlock.astro";
 import Analytics from "../../components/Analytics.astro";
 /** 文章索引页：日期倒序 + 摘要 + 阅读时长 + 搜索 + 标签筛选 */
 const site = Astro.site ?? new URL('https://my-footy-site.pages.dev/');
@@ -69,6 +70,8 @@ const style = `
     <link rel="alternate" type="application/rss+xml" title="Footy Analytics RSS" href="/rss.xml" />
     <style is:global set:html={style}></style>
     <Analytics />
+  <HeadBlock kind="website" title="Articles — Footy Analytics" description="足球数据与投注模型的实践笔记与教程合集。" />
+  <HeadBlock kind="website" title="Articles — Footy Analytics" description="足球数据与投注模型的实践笔记与教程合集。" />
 </head>
   <body>
     <header>
