@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /debug/
-
 Sitemap: https://my-footy-site.pages.dev/sitemap-index.xml
+Disallow: /debug/
