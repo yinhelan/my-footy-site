@@ -1,4 +1,14 @@
 ---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const meta = {
+  title: 'Poisson Calculator',
+  description: 'Estimate expected goals (λ) and scoreline probabilities. Export CSV/PNG, shareable URLs.',
+  lang: 'en',
+  ogImage: '/og/poisson.png'
+};
+---
+<BaseLayout {...meta}>
+---
 import HeadBlock from "../../components/HeadBlock.astro";
 import Analytics from "../../components/Analytics.astro";
 const style = `
@@ -327,3 +337,38 @@ const style = `
     </script>
   </body>
 </html>
+</BaseLayout>
+
+<button type="button" id="btn-share">Share link</button>
+<script type="module">
+  import { makeShareUrl, readParams, normalizeDecimal } from '../../lib/share.ts';
+
+  const form = document.querySelector('#tool-form');
+  const shareBtn = document.querySelector('#btn-share');
+
+  // URL 参数回填
+  const defaults = {}; // 需要默认值可填 { home: 1.4, away: 1.1 }
+  const state = readParams(defaults);
+  if (form) {
+    Object.entries(state).forEach(([k, v]) => {
+      const el = form.querySelector(`[name="${k}"]`);
+      if (el) el.value = String(v);
+    });
+    // 文本数值输入做小数点归一化
+    form.querySelectorAll('input[type="text"], input[type="number"]').forEach(el => {
+      el.addEventListener('blur', () => {
+        const norm = normalizeDecimal(el.value);
+        if (norm !== el.value) el.value = norm;
+      });
+    });
+  }
+
+  // 复制分享链接
+  shareBtn?.addEventListener('click', async () => {
+    if (!form) return;
+    const data = Object.fromEntries(new FormData(form));
+    const url = makeShareUrl(window.location.pathname, data);
+    try { await navigator.clipboard.writeText(url); alert('Share link copied!'); }
+    catch { window.prompt('Copy your share URL:', url); }
+  });
+</script>

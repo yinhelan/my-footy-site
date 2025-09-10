@@ -1,4 +1,13 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
+const meta = {
+  title: 'Home',
+  description: 'Football analytics tools: Poisson, Implied Odds, and Kelly with shareable links.',
+  lang: 'en'
+};
+---
+<BaseLayout {...meta}>
+---
 import HeadBlock from "../components/HeadBlock.astro";
 import Analytics from "../components/Analytics.astro";
 const title = "Football Analytics Starter";
@@ -23,3 +32,4 @@ const title = "Football Analytics Starter";
 </ul>
   </body>
 </html>
+</BaseLayout>
