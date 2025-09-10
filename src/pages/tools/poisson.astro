@@ -8,37 +8,8 @@ const meta = {
 };
 ---
 <BaseLayout {...meta}>
----
-import HeadBlock from "../../components/HeadBlock.astro";
-import Analytics from "../../components/Analytics.astro";
-const style = `
-  *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
-  .col{flex:1 1 260px} input{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px}
-  button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;margin-right:8px}
-  .btn{background:#111;color:#fff} .card{border:1px solid #eee;border-radius:12px;padding:14px}
-  table{border-collapse:collapse;width:100%} td,th{border:1px solid #eee;padding:6px;text-align:center}
-  h1{margin-bottom:8px}
-  .muted{color:#666}
-`;
----
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Poisson Scoreline & BTTS/OU Calculator</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <link rel="canonical" href="https://my-footy-site.pages.dev/tools/poisson" />
-    <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Football Poisson Scoreline Calculator","applicationCategory":"SportsApplication","operatingSystem":"Web","url":"https://my-footy-site.pages.dev/tools/poisson","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
-    </script>
-    <style is:global set:html={style}></style>
-    <Analytics />
-  <meta name="x-poisson-check" content="G-YPZQKGD20M">
-  <meta name="x-poisson-check" content="G-YPZQKGD20M">
-  <HeadBlock kind="website" title="Poisson Scoreline & BTTS/OU Calculator" description="输入 λ_home / λ_away 生成比分矩阵、BTTS 与大小球概率，支持导出与分享。" image="/og/poisson.png" />
-  <HeadBlock kind="website" title="Poisson Scoreline & BTTS/OU Calculator" description="输入 λ_home / λ_away 生成比分矩阵、BTTS 与大小球概率，支持导出与分享。" />
-</head>
-  <body style="font-family: system-ui; max-width: 960px; margin: 24px auto; padding: 0 16px;">
-    <h1>Poisson Scoreline & BTTS/OU Calculator</h1>
+
+<h1>Poisson Scoreline & BTTS/OU Calculator</h1>
     <p>Tip: You can type <b>1.40</b> or even <b>１．４０ / 1,40</b> — the inputs will be normalized automatically.</p>
 
     <!-- 估 λ 卡片（近 N 场） -->
@@ -114,7 +85,7 @@ const style = `
     </div>
 
     <script>
-      // ---------- Utilities ----------
+      // -
       function normalizeNum(s){
         if(!s) return '';
         s = String(s).trim()
@@ -134,7 +105,7 @@ const style = `
         return Number.isFinite(num) ? num : fallback;
       }
 
-      // ---------- Lambda estimator ----------
+      // -
       function safeNum(id, fb=0){
         const el = $(id); if(!el) return fb;
         const v = normalizeNum(el.value);
@@ -165,13 +136,13 @@ const style = `
         return {lamH, lamA};
       }
 
-      // ---------- Math ----------
+      // -
       const factMemo = {0:1};
       function factorial(n){ if(factMemo[n]) return factMemo[n]; let r=1; for(let i=2;i<=n;i++) r*=i; factMemo[n]=r; return r; }
       function pois(k, lam){ if(lam<=0 && k===0) return 1; if(lam<=0) return 0; return Math.exp(-lam) * Math.pow(lam, k) / factorial(k); }
       function buildPmf(lam, kMax){ const arr=[]; for(let k=0;k<=kMax;k++) arr.push(pois(k, lam)); const s=arr.reduce((a,b)=>a+b,0); return s>0 ? arr.map(x=>x/s) : arr; }
 
-      // ---------- Compute & render ----------
+      // -
       function compute(){
         let lamH = readNumber('lamHome'); if(!Number.isFinite(lamH)) { lamH = 1.40; $('lamHome').value = '1.40'; }
         let lamA = readNumber('lamAway'); if(!Number.isFinite(lamA)) { lamA = 1.10; $('lamAway').value = '1.10'; }
@@ -227,7 +198,7 @@ const style = `
         $('result').style.display = 'block';
       }
 
-      // ---------- Actions ----------
+      // -
       function copySummary(){
         const r = window.__lastResult;
         if(!r){ alert('Calculate first.'); return; }
@@ -335,9 +306,7 @@ const style = `
       $('shareBtn').addEventListener('click', shareLink);
       $('pngBtn').addEventListener('click', exportMatrixPNG);
     </script>
-  </body>
-</html>
-</BaseLayout>
+  </BaseLayout>
 
 <button type="button" id="btn-share">Share link</button>
 <script type="module">

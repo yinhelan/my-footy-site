@@ -1,35 +1,36 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
 const meta = {
-  title: 'Home',
-  description: 'Football analytics tools: Poisson, Implied Odds, and Kelly with shareable links.',
+  title: 'Football Analytics Starter',
+  description: 'Football analytics tools: Poisson, Implied → Fair odds, and Kelly staking, with shareable links.',
   lang: 'en'
 };
 ---
 <BaseLayout {...meta}>
----
-import HeadBlock from "../components/HeadBlock.astro";
-import Analytics from "../components/Analytics.astro";
-const title = "Football Analytics Starter";
----
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>{meta.title}</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <link rel="alternate" type="application/rss+xml" title="Footy Analytics RSS" href="/rss.xml" />
-  <Analytics />
-  <HeadBlock kind="website" title="Footy Analytics — Simple football analytics tools & notes" description="Poisson 进球分布、隐含概率转公平赔率、凯利投注计算等实用工具与笔记。" image="/og/home.png" />
-  <HeadBlock kind="website" title="Footy Analytics — Simple football analytics tools & notes" description="Poisson 进球分布、隐含概率转公平赔率、凯利投注计算等实用工具与笔记。" />
-</head>
-  <body style="font-family: system-ui; max-width: 900px; margin: 24px auto; padding: 0 16px;">
-    <h1>{meta.title}</h1>
-    <ul>
-      <li><a href="/articles/">Articles</a></li>
-      <li><a href="/tools/poisson">Poisson Scoreline & BTTS/OU Calculator</a></li>
-      <li><a href="/tools/implied-odds">Implied odds → Fair odds (remove overround)</a></li>
-  <li><a href="/tools/kelly">Kelly stake calculator</a></li>
-</ul>
-  </body>
-</html>
+  <main style="max-width: 820px; margin: 2rem auto; padding: 0 1rem">
+    <header>
+      <h1 style="margin:0 0 .5rem 0;">{meta.title}</h1>
+      <p style="margin:.25rem 0 1.5rem 0;">Three handy tools and a couple of starter articles.</p>
+    </header>
+
+    <nav aria-label="Quick links" style="margin-bottom: 1.5rem;">
+      <ul style="display:grid;grid-template-columns: repeat(auto-fit,minmax(180px,1fr));gap:.5rem;list-style:none;padding-left:0;">
+        <li><a href="/tools/poisson/">Poisson</a></li>
+        <li><a href="/tools/implied-odds/">Implied odds → Fair odds</a></li>
+        <li><a href="/tools/kelly/">Kelly stake calculator</a></li>
+        <li><a href="/articles/">Articles</a></li>
+      </ul>
+    </nav>
+
+    <section>
+      <h2 style="margin:.5rem 0 0.5rem 0;">What’s inside</h2>
+      <ul>
+        <li><strong>Poisson Scoreline &amp; BTTS/OU</strong> — estimate λ, see Top 5 scorelines, full matrix, export/share results.</li>
+        <li><strong>Implied → Fair odds</strong> — remove overround across 2-way/3-way markets; mixed formats supported.</li>
+        <li><strong>Kelly</strong> — stake sizing with Full/Half/Quarter suggestions.</li>
+        <li><strong>Articles</strong> — quick intros and how-to guides.</li>
+      </ul>
+    </section>
+  </main>
 </BaseLayout>

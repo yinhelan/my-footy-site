@@ -1,5 +1,4 @@
 ---
-import HeadBlock from "../../components/HeadBlock.astro";
 import Analytics from "../../components/Analytics.astro";
 const style = `
   *{box-sizing:border-box} .row{display:flex;gap:12px;flex-wrap:wrap}
@@ -22,10 +21,7 @@ const style = `
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Implied Odds & Overround Remover","applicationCategory":"SportsApplication","operatingSystem":"Web","url":"https://my-footy-site.vercel.app/tools/implied-odds","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
     </script>
     <style is:global set:html={style}></style>
-    <Analytics />
-  <HeadBlock kind="website" title="Implied → Fair Odds (Overround Remover)" description="把 1X2/两方盘的混合赔率转换为隐含概率，归一为 100% 得到公平赔率，或设置总抽水目标。" />
-  <HeadBlock kind="website" title="Implied → Fair Odds (Overround Remover)" description="把 1X2/两方盘的混合赔率转换为隐含概率，归一为 100% 得到公平赔率，或设置总抽水目标。" />
-</head>
+    </head>
   <body style="font-family: system-ui; max-width: 1000px; margin: 24px auto; padding: 0 16px;">
 
     <h1>Implied Odds → Fair Odds (remove overround)</h1>
@@ -304,3 +300,32 @@ const style = `
     </script>
   </body>
 </html>
+
+<button type="button" id="btn-share">Share link</button>
+<script type="module">
+  import { makeShareUrl, readParams, normalizeDecimal } from '../../lib/share.ts';
+  const form = document.querySelector('#tool-form');
+  const shareBtn = document.querySelector('#btn-share');
+
+  const defaults = {};
+  const state = readParams(defaults);
+  if (form) {
+    Object.entries(state).forEach(([k, v]) => {
+      const el = form.querySelector(`[name="${k}"]`);
+      if (el) el.value = String(v);
+    });
+    form.querySelectorAll('input[type="text"], input[type="number"]').forEach(el => {
+      el.addEventListener('blur', () => {
+        const n = normalizeDecimal(el.value);
+        if (n !== el.value) el.value = n;
+      });
+    });
+  }
+  shareBtn?.addEventListener('click', async () => {
+    if (!form) return;
+    const data = Object.fromEntries(new FormData(form));
+    const url = makeShareUrl(window.location.pathname, data);
+    try { await navigator.clipboard.writeText(url); alert('Share link copied!'); }
+    catch { window.prompt('Copy your share URL:', url); }
+  });
+</script>
