@@ -16,5 +16,9 @@
     "@astrojs/rss": "^4.0.12",
     "@astrojs/sitemap": "^3.5.1",
     "@resvg/resvg-js": "^2.6.2"
-  }
+  },
+  "engines": {
+    "node": ">=20 <23"
+  },
+  "packageManager": "pnpm@10.15.1"
 }
