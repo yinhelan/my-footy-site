@@ -1,7 +1,8 @@
-import { defineConfig } from 'astro/config';
-import sitemap from '@astrojs/sitemap';
+// astro.config.mjs
+import { defineConfig } from 'astro/config'
+import sitemap from '@astrojs/sitemap'
 
 export default defineConfig({
-  site: 'https://my-footy-site.pages.dev/',
+  site: 'https://my-footy-site.pages.dev',
   integrations: [sitemap()],
-});
+})
