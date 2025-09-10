@@ -7,7 +7,7 @@ const canonical = new URL('/articles/', site).toString();
 
 /** 读取文章模块（frontmatter/url）与原文（用于估算阅读时长） */
 const mdMods = import.meta.glob('./*.md', { eager: true });
-const rawMods = import.meta.glob('./*.md', { eager: true, as: 'raw' });
+const rawMods = import.meta.glob('./*.md', { eager: true, query: '?raw', import: 'default' });
 
 function minutesFromRaw(raw = '') {
   const s = String(raw);
