@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://my-footy-site.pages.dev/sitemap-index.xml
-Disallow: /debug/
-
-# build 2025-09-10T07:45:27Z
