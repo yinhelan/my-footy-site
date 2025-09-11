@@ -1,57 +1,32 @@
 ---
 import SiteHeader from '../components/SiteHeader.astro';
-
+import Seo from '../components/Seo.astro';
 const cards = [
-  {
-    href: '/tools/match-insights/',
-    title: 'Match Insights',
-    desc: 'Poisson → Fair odds → Kelly，一页闭环的比赛分析。',
-  },
-  {
-    href: '/tools/poisson/',
-    title: 'Poisson',
-    desc: '用 λ 估计比分分布与 Top Scorelines。',
-  },
-  {
-    href: '/tools/implied-odds/',
-    title: 'Implied Odds',
-    desc: '从盘口/水位推公平概率与合理赔率。',
-  },
-  {
-    href: '/tools/kelly/',
-    title: 'Kelly',
-    desc: '根据模型优势与资金管理计算建议注额。',
-  },
-  {
-    href: '/articles/',
-    title: 'Articles',
-    desc: '模型、赔率、资金管理相关文章归档。',
-  },
-  {
-    href: '/tags/',
-    title: 'Tags',
-    desc: '按主题浏览文章，例如 Poisson / Kelly / Odds。',
-  },
+  { href: '/tools/match-insights/', title: 'Match Insights', desc: 'Poisson → 公平赔率 → Kelly，一页闭环。' },
+  { href: '/tools/poisson/',        title: 'Poisson',         desc: 'λ 驱动比分分布与 Top Scorelines。' },
+  { href: '/tools/implied-odds/',   title: 'Implied Odds',    desc: '去水位，得到公平概率/赔率。' },
+  { href: '/tools/kelly/',          title: 'Kelly',           desc: '按模型优势与资金管理计算注额。' },
+  { href: '/articles/',             title: 'Articles',        desc: '模型、赔率、资金管理文章合集。' },
+  { href: '/tags/',                 title: 'Tags',            desc: '按主题浏览文章与工具示例。' },
 ];
+const absUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://my-footy-site.pages.dev').toString();
 ---
 <html lang="zh">
   <head>
     <meta charset="utf-8" />
-    <title>my-footy-site · Football Tools & Notes</title>
-    <meta name="description" content="Poisson、Implied Odds、Kelly 等足球模型工具与文章。" />
-    <meta property="og:title" content="my-footy-site · Football Tools & Notes" />
-    <meta property="og:description" content="Poisson、Implied Odds、Kelly 等足球模型工具与文章。" />
+    <Seo
+      title="Footy Analytics · Football odds tools & notes"
+      description="免费足球分析工具：泊松比分、去水位得到公平赔率、Kelly 资金管理，并配套文章示例。"
+      url={absUrl}
+    />
   </head>
   <body class="min-h-screen bg-neutral-50 text-neutral-900">
     <SiteHeader />
-    <main class="max-w-5xl mx-auto px-4 py-10">
+    <main class="max-w-5xl mx-auto px-4 py-10" role="main">
       <section class="mb-8">
         <h1 class="text-3xl font-bold">Football Tools & Notes</h1>
-        <p class="text-neutral-600 mt-2">
-          轻量级投注辅助：从比分分布到公平赔率，再到 Kelly 资金管理。理性参与，谨慎决策。
-        </p>
+        <p class="text-neutral-600 mt-2">从比分分布到公平赔率，再到 Kelly 资金管理——轻量但实用的分析链路。</p>
       </section>
-
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
           <a href={c.href} class="block p-5 rounded-2xl bg-white border shadow-sm hover:shadow-md transition">

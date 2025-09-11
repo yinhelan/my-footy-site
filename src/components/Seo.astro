@@ -1,0 +1,24 @@
+---
+const {
+  title = 'Footy Analytics',
+  description = 'Football odds tools: Poisson, implied→fair odds, Kelly staking.',
+  type = 'website',
+  url = Astro.url?.href ?? '',
+  image = '/og/default.png',
+} = Astro.props as {
+  title?: string; description?: string; type?: string; url?: string; image?: string;
+};
+const site = Astro.site?.origin ?? '';
+---
+<title>{title}</title>
+<meta name="description" content={description} />
+<meta property="og:type" content={type} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={url || site} />
+<meta property="og:image" content={image.startsWith('http') ? image : site + image} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={image.startsWith('http') ? image : site + image} />
+<link rel="canonical" href={url || site} />

@@ -1,19 +1,28 @@
 ---
 import MatchInsights from "../../components/tools/MatchInsights";
 import SiteHeader from "../../components/SiteHeader.astro";
+import Seo from "../../components/Seo.astro";
+const absUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://my-footy-site.pages.dev').toString();
 ---
-<html lang="en">
+<html lang="zh">
   <head>
     <meta charset="utf-8" />
-    <title>Match Insights · my-footy-site</title>
-    <meta name="description" content="One-page pipeline: Poisson scorelines → 1X2 fair odds → Kelly stake sizing." />
+    <Seo
+      title="Match Insights · Footy Analytics"
+      description="一页闭环：Poisson 比分分布 → 公平赔率 → Kelly 资金管理。可复制摘要与导出 Top5 比分。"
+      url={absUrl}
+      type="website"
+    />
   </head>
   <body class="min-h-screen bg-neutral-50 text-neutral-900">
     <SiteHeader />
-    <main class="max-w-5xl mx-auto px-4 py-8">
+    <main class="max-w-5xl mx-auto px-4 py-8" role="main" aria-label="Match Insights tool page">
       <h1 class="text-3xl font-bold mb-2">Match Insights</h1>
       <p class="text-sm text-neutral-600 mb-6">Poisson → Fair odds → Kelly（单页闭环）。</p>
       <MatchInsights client:load />
+      <section class="mt-8 text-sm text-neutral-600" aria-label="Disclaimer">
+        本工具仅用于学习与模型演示，不构成任何投注建议。请理性参与，风险自负。
+      </section>
     </main>
   </body>
 </html>

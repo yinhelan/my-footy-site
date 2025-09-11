@@ -26,10 +26,6 @@ const style = `
   <body style="font-family: system-ui; max-width: 960px; margin: 24px auto; padding: 0 16px;">
 
     <h1>Kelly Stake Calculator</h1>
-      <section class="mt-2 text-sm text-neutral-600" data-seo-desc="kelly">
-        根据模型概率与市场赔率计算凯利公式建议注额，支持设置资金规模与单注上限（Half/Quarter Kelly 可通过调整上限实现）。
-        当模型无优势（edge ≤ 0）时建议注额为 0；本工具用于学习交流，不构成任何投注建议。
-      </section>
     <p class="muted">输入你的<b>赔率</b>与<b>自估概率</b>，计算凯利比例与下注额。赔率支持 Decimal（2.10）、Fractional（13/10）、American（+120/-150）。概率可填 0.52 或 52%。</p>
 
     <div class="card">

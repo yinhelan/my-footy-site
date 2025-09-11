@@ -1,18 +1,31 @@
 ---
 import SiteHeader from '../components/SiteHeader.astro';
+import Seo from '../components/Seo.astro';
 const { title, description, date, tags = [] } = Astro.props as {
   title: string; description?: string; date: Date | string; tags?: string[];
 };
+const absUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://my-footy-site.pages.dev').toString();
 ---
 <html lang="zh">
   <head>
+    <!-- 必须优先声明字符集，防乱码 -->
     <meta charset="utf-8" />
-    <title>{title} · my-footy-site</title>
-    <meta name="description" content={description ?? title} />
+    <Seo title={`${title} · Footy Analytics`} description={description ?? title} url={absUrl} type="article" />
+    <script type="application/ld+json">
+      {JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: title,
+        datePublished: new Date(date).toISOString(),
+        author: { '@type': 'Person', name: 'Yiming Lan' },
+        publisher: { '@type': 'Organization', name: 'Footy Analytics' },
+        mainEntityOfPage: absUrl,
+      })}
+    </script>
   </head>
   <body class="min-h-screen bg-neutral-50 text-neutral-900">
     <SiteHeader />
-    <main class="prose prose-neutral max-w-3xl mx-auto px-4 py-10">
+    <main class="prose prose-neutral max-w-3xl mx-auto px-4 py-10" role="main">
       <header>
         <h1 class="mb-2">{title}</h1>
         <p class="text-sm text-neutral-500">
@@ -25,7 +38,7 @@ const { title, description, date, tags = [] } = Astro.props as {
         <slot />
       </article>
       <footer class="text-xs text-neutral-500 mt-10">
-        本文由 my-footy-site 提供。
+        本站工具与内容仅用于学习交流，不构成投资/投注建议。
       </footer>
     </main>
   </body>

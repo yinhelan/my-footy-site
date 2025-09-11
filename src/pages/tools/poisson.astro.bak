@@ -10,10 +10,6 @@ const meta = {
 <BaseLayout {...meta}>
 
 <h1>Poisson Scoreline & BTTS/OU Calculator</h1>
-      <section class="mt-2 text-sm text-neutral-600" data-seo-desc="poisson">
-        本工具基于泊松分布建模足球进球数，给出完整比分概率矩阵与 Top Scorelines，并据此汇总 1X2（主/平/客）概率与公平赔率。
-        适用于前置已估计出两队期望进球（λ）场景，可用于检视模型倾向、验证盘口合理性或为 Kelly 下注提供输入。
-      </section>
     <p>Tip: You can type <b>1.40</b> or even <b>１．４０ / 1,40</b> — the inputs will be normalized automatically.</p>
 
     <!-- 估 λ 卡片（近 N 场） -->
