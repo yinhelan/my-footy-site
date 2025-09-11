@@ -10,6 +10,11 @@ const meta = {
 <BaseLayout {...meta}>
 
 <h1>Poisson Scoreline & BTTS/OU Calculator</h1>
+      <section class="mt-1 text-sm text-neutral-600" data-seo-desc-en="poisson">
+        Models football goals with a Poisson distribution, producing a full scoreline probability matrix and top scorelines.
+        Aggregates to 1X2 probabilities and fair odds. Best used when expected goals (λ) are already estimated;
+        helpful to inspect model bias, sanity-check market prices, and feed Kelly staking.
+      </section>
       <section class="mt-2 text-sm text-neutral-600" data-seo-desc="poisson">
         本工具基于泊松分布建模足球进球数，给出完整比分概率矩阵与 Top Scorelines，并据此汇总 1X2（主/平/客）概率与公平赔率。
         适用于前置已估计出两队期望进球（λ）场景，可用于检视模型倾向、验证盘口合理性或为 Kelly 下注提供输入。

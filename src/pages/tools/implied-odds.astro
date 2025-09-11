@@ -24,7 +24,12 @@ const style = `
     </head>
   <body style="font-family: system-ui; max-width: 1000px; margin: 24px auto; padding: 0 16px;">
 
+    <main role="main">
     <h1>Implied Odds → Fair Odds (remove overround)</h1>
+      <section class="mt-1 text-sm text-neutral-600" data-seo-desc-en="implied">
+        Converts bookmaker odds into implied probabilities and overround, then renormalizes to fair probabilities and prices.
+        Accepts mixed 1X2 inputs; useful for comparing margins across books and preparing model-vs-market comparisons.
+      </section>
       <section class="mt-2 text-sm text-neutral-600" data-seo-desc="implied">
         将市场赔率转换为隐含概率，并计算返还率（overround），再做归一化得到公平概率与公平赔率（fair odds）。
         支持直接混填 1X2 赔率，便于对比不同博彩公司水位与边际，作为模型对比或套利筛查的参考。

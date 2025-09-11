@@ -19,12 +19,6 @@ const absUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://my-footy-site.
     <main class="max-w-5xl mx-auto px-4 py-8" role="main" aria-label="Match Insights tool page">
       <h1 class="text-3xl font-bold mb-2">Match Insights</h1>
       <p class="text-sm text-neutral-600 mb-6">Poisson → Fair odds → Kelly（单页闭环）。</p>
-      <!-- ★ 新增英文 SEO 描述（固定） -->
-      <section class="mt-1 text-sm text-neutral-600" data-seo-desc-en="match-insights">
-        End-to-end worksheet: Poisson scorelines → fair 1X2 odds (overround removed) → Kelly staking.
-        Includes a copy-ready text summary and CSV export of top scorelines.
-      </section>
-
       <MatchInsights client:visible />
       <section class="mt-8 text-sm text-neutral-600" aria-label="Disclaimer">
         本工具仅用于学习与模型演示，不构成任何投注建议。请理性参与，风险自负。

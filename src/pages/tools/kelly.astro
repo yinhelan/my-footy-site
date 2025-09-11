@@ -25,7 +25,13 @@ const style = `
     </head>
   <body style="font-family: system-ui; max-width: 960px; margin: 24px auto; padding: 0 16px;">
 
+    <main role="main">
     <h1>Kelly Stake Calculator</h1>
+      <section class="mt-1 text-sm text-neutral-600" data-seo-desc-en="kelly">
+        Computes Kelly stakes from model probabilities and market odds; supports bankroll sizing and per-bet cap.
+        Half/Quarter Kelly can be mimicked via the cap. If edge ≤ 0, the recommended stake is 0.
+        Educational use only; not financial or betting advice.
+      </section>
       <section class="mt-2 text-sm text-neutral-600" data-seo-desc="kelly">
         根据模型概率与市场赔率计算凯利公式建议注额，支持设置资金规模与单注上限（Half/Quarter Kelly 可通过调整上限实现）。
         当模型无优势（edge ≤ 0）时建议注额为 0；本工具用于学习交流，不构成任何投注建议。

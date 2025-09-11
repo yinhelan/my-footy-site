@@ -12,13 +12,18 @@ const site = Astro.site?.origin ?? '';
 ---
 <title>{title}</title>
 <meta name="description" content={description} />
+<!-- Mobile layout -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Open Graph -->
 <meta property="og:type" content={type} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:url" content={url || site} />
 <meta property="og:image" content={image.startsWith('http') ? image : site + image} />
+<!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={image.startsWith('http') ? image : site + image} />
+<!-- Canonical -->
 <link rel="canonical" href={url || site} />
