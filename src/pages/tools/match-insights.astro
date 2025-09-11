@@ -1,0 +1,19 @@
+---
+import MatchInsights from "../../components/tools/MatchInsights";
+import SiteHeader from "../../components/SiteHeader.astro";
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Match Insights · my-footy-site</title>
+    <meta name="description" content="One-page pipeline: Poisson scorelines → 1X2 fair odds → Kelly stake sizing." />
+  </head>
+  <body class="min-h-screen bg-neutral-50 text-neutral-900">
+    <SiteHeader />
+    <main class="max-w-5xl mx-auto px-4 py-8">
+      <h1 class="text-3xl font-bold mb-2">Match Insights</h1>
+      <p class="text-sm text-neutral-600 mb-6">Poisson → Fair odds → Kelly（单页闭环）。</p>
+      <MatchInsights client:load />
+    </main>
+  </body>
+</html>

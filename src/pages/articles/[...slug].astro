@@ -1,0 +1,19 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import ArticleLayout from '../../layouts/ArticleLayout.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('articles', ({ data }) => data.draft !== true);
+  return posts.map((p) => ({ params: { slug: p.slug } }));
+}
+
+const { slug } = Astro.params;
+const entry = await getEntry('articles', slug!);
+if (!entry) throw new Error(`Article not found: ${slug}`);
+
+const { Content } = await entry.render();
+const data = entry.data;
+---
+<ArticleLayout title={data.title} description={data.description} date={data.date} tags={data.tags}>
+  <Content />
+</ArticleLayout>

@@ -1,22 +1,20 @@
 ---
-const title = "Page Not Found";
+import SiteHeader from '../components/SiteHeader.astro';
 ---
-<!doctype html>
-<html lang="en">
-  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>404 · Footy Analytics</title>
-    <style>body{font-family:system-ui;margin:4rem auto;max-width:720px;padding:0 16px}
-    a.btn{display:inline-block;margin-top:12px;padding:8px 12px;border:1px solid #ccc;border-radius:10px;text-decoration:none}</style>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>404 · Page Not Found</title>
   </head>
-  <body>
-    <h1>404</h1>
-    <p>That page doesn’t exist.</p>
-    <p>
-      <a class="btn" href="/">← Home</a>
-      <a class="btn" href="/tools/poisson">Poisson</a>
-      <a class="btn" href="/tools/implied-odds">Implied odds</a>
-      <a class="btn" href="/tools/kelly">Kelly</a>
-      <a class="btn" href="/articles/">Articles</a>
-    </p>
+  <body class="min-h-screen bg-neutral-50 text-neutral-900">
+    <SiteHeader />
+    <main class="max-w-3xl mx-auto px-4 py-16 text-center">
+      <h1 class="text-4xl font-bold mb-4">404</h1>
+      <p class="text-neutral-600 mb-6">你访问的页面不存在。</p>
+      <div class="flex gap-3 justify-center">
+        <a class="px-4 py-2 rounded-xl bg-neutral-900 text-white" href="/">回到首页</a>
+        <a class="px-4 py-2 rounded-xl bg-white border" href="/articles/">查看文章</a>
+      </div>
+    </main>
   </body>
 </html>

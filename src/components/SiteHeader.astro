@@ -1,0 +1,25 @@
+---
+const path = Astro.url.pathname;
+const nav = [
+  { href: '/', label: 'Home' },
+  { href: '/tools/match-insights/', label: 'Match' },
+  { href: '/articles/', label: 'Articles' },
+  { href: '/tags/', label: 'Tags' },
+];
+---
+<header class="bg-white/80 backdrop-blur border-b sticky top-0 z-50">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <a href="/" class="font-bold tracking-wide">my-footy-site</a>
+    <nav class="flex items-center gap-1">
+      {nav.map((n) => {
+        const active = path.startsWith(n.href);
+        return (
+          <a href={n.href}
+             class={`px-3 py-1 rounded-xl text-sm ${active ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-200'}`}>
+            {n.label}
+          </a>
+        );
+      })}
+    </nav>
+  </div>
+</header>

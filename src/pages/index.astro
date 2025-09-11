@@ -1,36 +1,65 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
 
-const meta = {
-  title: 'Football Analytics Starter',
-  description: 'Football analytics tools: Poisson, Implied → Fair odds, and Kelly staking, with shareable links.',
-  lang: 'en'
-};
+const cards = [
+  {
+    href: '/tools/match-insights/',
+    title: 'Match Insights',
+    desc: 'Poisson → Fair odds → Kelly，一页闭环的比赛分析。',
+  },
+  {
+    href: '/tools/poisson/',
+    title: 'Poisson',
+    desc: '用 λ 估计比分分布与 Top Scorelines。',
+  },
+  {
+    href: '/tools/implied-odds/',
+    title: 'Implied Odds',
+    desc: '从盘口/水位推公平概率与合理赔率。',
+  },
+  {
+    href: '/tools/kelly/',
+    title: 'Kelly',
+    desc: '根据模型优势与资金管理计算建议注额。',
+  },
+  {
+    href: '/articles/',
+    title: 'Articles',
+    desc: '模型、赔率、资金管理相关文章归档。',
+  },
+  {
+    href: '/tags/',
+    title: 'Tags',
+    desc: '按主题浏览文章，例如 Poisson / Kelly / Odds。',
+  },
+];
 ---
-<BaseLayout {...meta}>
-  <main style="max-width: 820px; margin: 2rem auto; padding: 0 1rem">
-    <header>
-      <h1 style="margin:0 0 .5rem 0;">{meta.title}</h1>
-      <p style="margin:.25rem 0 1.5rem 0;">Three handy tools and a couple of starter articles.</p>
-    </header>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>my-footy-site · Football Tools & Notes</title>
+    <meta name="description" content="Poisson、Implied Odds、Kelly 等足球模型工具与文章。" />
+    <meta property="og:title" content="my-footy-site · Football Tools & Notes" />
+    <meta property="og:description" content="Poisson、Implied Odds、Kelly 等足球模型工具与文章。" />
+  </head>
+  <body class="min-h-screen bg-neutral-50 text-neutral-900">
+    <SiteHeader />
+    <main class="max-w-5xl mx-auto px-4 py-10">
+      <section class="mb-8">
+        <h1 class="text-3xl font-bold">Football Tools & Notes</h1>
+        <p class="text-neutral-600 mt-2">
+          轻量级投注辅助：从比分分布到公平赔率，再到 Kelly 资金管理。理性参与，谨慎决策。
+        </p>
+      </section>
 
-    <nav aria-label="Quick links" style="margin-bottom: 1.5rem;">
-      <ul style="display:grid;grid-template-columns: repeat(auto-fit,minmax(180px,1fr));gap:.5rem;list-style:none;padding-left:0;">
-        <li><a href="/tools/poisson/">Poisson</a></li>
-        <li><a href="/tools/implied-odds/">Implied odds → Fair odds</a></li>
-        <li><a href="/tools/kelly/">Kelly stake calculator</a></li>
-        <li><a href="/articles/">Articles</a></li>
-      </ul>
-    </nav>
-
-    <section>
-      <h2 style="margin:.5rem 0 0.5rem 0;">What’s inside</h2>
-      <ul>
-        <li><strong>Poisson Scoreline &amp; BTTS/OU</strong> — estimate λ, see Top 5 scorelines, full matrix, export/share results.</li>
-        <li><strong>Implied → Fair odds</strong> — remove overround across 2-way/3-way markets; mixed formats supported.</li>
-        <li><strong>Kelly</strong> — stake sizing with Full/Half/Quarter suggestions.</li>
-        <li><strong>Articles</strong> — quick intros and how-to guides.</li>
-      </ul>
-    </section>
-  </main>
-</BaseLayout>
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((c) => (
+          <a href={c.href} class="block p-5 rounded-2xl bg-white border shadow-sm hover:shadow-md transition">
+            <h3 class="text-lg font-semibold">{c.title}</h3>
+            <p class="text-sm text-neutral-600 mt-1">{c.desc}</p>
+          </a>
+        ))}
+      </section>
+    </main>
+  </body>
+</html>

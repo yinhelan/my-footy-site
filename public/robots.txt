@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://my-footy-site.pages.dev/sitemap-index.xml

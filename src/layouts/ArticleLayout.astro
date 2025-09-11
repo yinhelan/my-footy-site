@@ -1,0 +1,32 @@
+---
+import SiteHeader from '../components/SiteHeader.astro';
+const { title, description, date, tags = [] } = Astro.props as {
+  title: string; description?: string; date: Date | string; tags?: string[];
+};
+---
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>{title} · my-footy-site</title>
+    <meta name="description" content={description ?? title} />
+  </head>
+  <body class="min-h-screen bg-neutral-50 text-neutral-900">
+    <SiteHeader />
+    <main class="prose prose-neutral max-w-3xl mx-auto px-4 py-10">
+      <header>
+        <h1 class="mb-2">{title}</h1>
+        <p class="text-sm text-neutral-500">
+          {new Date(date).toLocaleDateString('zh-CN')}
+          {tags?.length ? ` · ${tags.join(' / ')}` : ''}
+        </p>
+        <hr />
+      </header>
+      <article class="mt-6">
+        <slot />
+      </article>
+      <footer class="text-xs text-neutral-500 mt-10">
+        本文由 my-footy-site 提供。
+      </footer>
+    </main>
+  </body>
+</html>

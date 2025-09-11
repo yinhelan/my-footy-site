@@ -1,0 +1,35 @@
+---
+import { getCollection } from 'astro:content';
+import SiteHeader from '../../components/SiteHeader.astro';
+
+const posts = await getCollection('articles', ({ data }) => data.draft !== true);
+const tagCount = new Map<string, number>();
+for (const p of posts) for (const t of (p.data.tags ?? [])) tagCount.set(t, (tagCount.get(t) ?? 0) + 1);
+const tags = Array.from(tagCount.entries()).sort((a, b) => b[1] - a[1]);
+---
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tags · my-footy-site</title>
+    <meta name="description" content="文章标签导航" />
+  </head>
+  <body class="min-h-screen bg-neutral-50 text-neutral-900">
+    <SiteHeader />
+    <main class="max-w-4xl mx-auto px-4 py-8">
+      <h1 class="text-3xl font-bold mb-6">Tags</h1>
+      {tags.length === 0 ? (
+        <p class="text-neutral-500">暂无标签。</p>
+      ) : (
+        <ul class="flex flex-wrap gap-3">
+          {tags.map(([t, c]) => (
+            <li>
+              <a class="px-3 py-1 rounded-full bg-white border shadow-sm hover:bg-neutral-100" href={`/tags/${encodeURIComponent(t)}/`}>
+                {t} <span class="text-neutral-500">({c})</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
+  </body>
+</html>
