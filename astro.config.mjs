@@ -1,8 +1,9 @@
-import { defineConfig } from 'astro/config'
-import react from '@astrojs/react'
-import sitemap from '@astrojs/sitemap'
+import { defineConfig } from 'astro/config';
+import tailwind from '@astrojs/tailwind';
+import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
-  site: 'https://my-footy-site.pages.dev', // 改成你的自定义域名也可
-  integrations: [react(), sitemap()],
-})
+  site: 'https://my-footy-site.pages.dev',
+  integrations: [tailwind({ applyBaseStyles: true }), sitemap()],
+  vite: { build: { target: 'es2020' } },
+});

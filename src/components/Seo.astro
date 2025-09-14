@@ -1,29 +1,29 @@
 ---
+export interface Props {
+  title: string;
+  description?: string;
+  canonical?: string;
+  ogImage?: string;
+  jsonLd?: Record<string, any> | null;
+}
 const {
-  title = 'Footy Analytics',
-  description = 'Football odds tools: Poisson, implied→fair odds, Kelly staking.',
-  type = 'website',
-  url = Astro.url?.href ?? '',
-  image = '/og/default.png',
-} = Astro.props as {
-  title?: string; description?: string; type?: string; url?: string; image?: string;
-};
-const site = Astro.site?.origin ?? '';
+  title,
+  description = 'Football Tools & Notes',
+  canonical = Astro.request.url,
+  ogImage = '/og-default.svg',
+  jsonLd = null
+} = Astro.props;
 ---
 <title>{title}</title>
 <meta name="description" content={description} />
-<!-- Mobile layout -->
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<!-- Open Graph -->
-<meta property="og:type" content={type} />
+<link rel="canonical" href={canonical} />
+<meta property="og:type" content="website" />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
-<meta property="og:url" content={url || site} />
-<meta property="og:image" content={image.startsWith('http') ? image : site + image} />
-<!-- Twitter -->
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
-<meta name="twitter:image" content={image.startsWith('http') ? image : site + image} />
-<!-- Canonical -->
-<link rel="canonical" href={url || site} />
+<meta name="twitter:image" content={ogImage} />
+{jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)}></script>}

@@ -1,0 +1,34 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+
+const modules = import.meta.glob('../*.md', { eager: true }) as any;
+const counter = new Map<string, number>();
+for (const [, m] of Object.entries(modules)) {
+  const tags: string[] = (m as any).frontmatter?.tags || [];
+  tags.forEach(t => counter.set(String(t), (counter.get(String(t))||0)+1));
+}
+
+const tags = Array.from(counter.entries())
+  .map(([name, count]) => ({ name, count, href: `/articles/tags/${encodeURIComponent(name)}/` }))
+  .sort((a,b)=> b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'));
+
+const title = 'Tags · Articles';
+const jsonLd = {"@context":"https://schema.org","@type":"CollectionPage","name":"Tags","inLanguage":"zh-CN","url":Astro.request.url};
+---
+<AppLayout title={title} description="按标签浏览文章" jsonLd={jsonLd}>
+  <style>
+    .wrap{max-width:860px;margin:0 auto}
+    .tag{display:inline-flex;align-items:center;gap:.35rem;margin:.35rem;
+         background:#0ea5e910;border:1px solid #0ea5e933;color:#0a7;
+         padding:.25rem .5rem;border-radius:.6rem;text-decoration:none}
+    .count{color:#555;font-size:.9rem}
+  </style>
+
+  <h1>Tags</h1>
+  <div class="wrap">
+    {tags.length === 0 && <p>暂无标签。</p>}
+    {tags.map(t => (
+      <a class="tag" href={t.href}><span>{t.name}</span><span class="count">×{t.count}</span></a>
+    ))}
+  </div>
+</AppLayout>

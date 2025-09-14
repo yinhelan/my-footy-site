@@ -1,0 +1,54 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+const title = 'Kelly · Footy Analytics';
+const jsonLd = {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Kelly Calculator","applicationCategory":"SportsApplication","operatingSystem":"Web","url":Astro.request.url};
+---
+<AppLayout title={title} description="给定概率与赔率，计算 Kelly 与下注额（含上限）" jsonLd={jsonLd} active="kelly">
+  <style>
+    :root{--w:720px}
+    .card{border:1px solid #eee;border-radius:12px;padding:1rem}
+    table{border-collapse:collapse;width:100%} th,td{border-bottom:1px solid #eee;padding:.5rem;text-align:left}
+    input{width:100%;padding:.4rem .6rem;border:1px solid #ddd;border-radius:.5rem}
+    .row{display:grid;grid-template-columns:1fr 1fr 1fr 40px;gap:.5rem;align-items:center;margin:.4rem 0}
+    button{padding:.5rem .8rem;border:1px solid #ddd;border-radius:.6rem;background:#fafafa;cursor:pointer}
+    .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.7rem}
+  </style>
+
+  <h1>Kelly</h1>
+  <div class="card grid">
+    <label>Bankroll<input id="bank" value="1000" inputmode="decimal"/></label>
+    <label>单注上限（比例）<input id="cap" value="0.10" inputmode="decimal"/></label>
+    <div style="display:flex;gap:.6rem;align-self:end"><button id="add">+ 添加项</button><button id="calc">Calculate</button></div>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <div id="rows"></div>
+    <table style="margin-top:.6rem">
+      <thead><tr><th>#</th><th>p(%)</th><th>odds</th><th>Kelly frac</th><th>stake(¥)</th></tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { kellyFrac, stake } from '../../../lib/kelly.ts';
+    import { parseOdds, fmtOdds } from '../../../lib/odds.ts';
+    const rows=document.getElementById('rows'), tb=document.getElementById('tb');
+    function addRow(p='40', o='2.10'){ const d=document.createElement('div'); d.className='row';
+      d.innerHTML=`<input placeholder="概率% (如 40)" value="${p}"/><input placeholder="赔率 (可+120/13/10/2.1)" value="${o}"/><div></div><button aria-label="删除">×</button>`;
+      rows.appendChild(d); d.querySelector('button')!.onclick=()=>d.remove();
+    }
+    ['40|2.10','30|3.40','28|3.60'].forEach(s=>{const [p,o]=s.split('|'); addRow(p,o);});
+    document.getElementById('add')!.addEventListener('click',()=>addRow('33','3.00'));
+    function calc(){
+      const bank = Number((document.getElementById('bank') as HTMLInputElement).value.replace(',','.')) || 0;
+      const cap  = Number((document.getElementById('cap') as HTMLInputElement).value.replace(',','.')) || 0.1;
+      const items = [...rows.querySelectorAll('.row')].map((r,i)=>{
+        const ins = r.querySelectorAll('input'); const p = Math.max(0, Math.min(1, Number((ins[0] as HTMLInputElement).value)/100));
+        const odds = parseOdds((ins[1] as HTMLInputElement).value); const frac = kellyFrac(p, odds); const st = stake(bank, frac, cap);
+        return { i:i+1, p, odds, frac, st };
+      });
+      tb.innerHTML = items.map(x=>`<tr><td>${x.i}</td><td>${(x.p*100).toFixed(2)}%</td><td>${fmtOdds(x.odds)}</td><td>${(x.frac*100).toFixed(2)}%</td><td>${x.st.toFixed(2)}</td></tr>`).join('');
+    }
+    document.getElementById('calc')!.addEventListener('click',calc); calc();
+  </script>
+</AppLayout>

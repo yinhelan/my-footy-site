@@ -1,46 +1,33 @@
 ---
-const UMAMI_ID  = import.meta.env.PUBLIC_UMAMI_WEBSITE_ID;
-const UMAMI_SRC = import.meta.env.PUBLIC_UMAMI_SCRIPT_SRC || 'https://us.umami.is/script.js';
-const GA4_ID    = (import.meta.env.PUBLIC_GA4_ID && import.meta.env.PUBLIC_GA4_ID.trim()) || 'G-YPZQKGD20M';
+interface Props { ga4Id?: string; defaultConsent?: 'granted' | 'denied'; }
+const GAID = Astro.props.ga4Id ?? import.meta.env.PUBLIC_GA4_ID;
+const DEFAULT = Astro.props.defaultConsent ?? 'denied';
 ---
-{UMAMI_ID && <script async defer data-website-id={UMAMI_ID} src={UMAMI_SRC}></script>}
-{GA4_ID && (
-  <>
-    <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}></script>
-    <script>{`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date()); gtag('config','${GA4_ID}');`}</script>
-  </>
-)}
-<script>
-(function(){
-  function send(name, params){
-    try{
-      if(window.umami && typeof window.umami.track === 'function'){ window.umami.track(name, params); return; }
-      if(window.gtag){ window.gtag('event', name, params||{}); }
-    }catch(e){}
-  }
-  function bind(id, event, name){
-    var el=document.getElementById(id); if(!el) return;
-    el.addEventListener(event, function(){ send(name, {path: location.pathname}); });
-  }
-  document.addEventListener('DOMContentLoaded', function(){
-    var p = location.pathname;
-    if(p.startsWith('/tools/poisson')){
-      bind('calcBtn','click','poisson_calc');
-      bind('copyBtn','click','poisson_copy');
-      bind('csvBtn','click','poisson_csv');
-      bind('shareBtn','click','poisson_share');
-      bind('pngBtn','click','poisson_png');
-    }else if(p.startsWith('/tools/implied-odds')){
-      bind('calcBtn','click','implied_calc');
-      bind('copyBtn','click','implied_copy');
-      bind('csvBtn','click','implied_csv');
-      bind('shareBtn','click','implied_share');
-    }else if(p.startsWith('/tools/kelly')){
-      bind('calcBtn','click','kelly_calc');
-      bind('copyBtn','click','kelly_copy');
-      bind('shareBtn','click','kelly_share');
+{GAID && (
+  <script type="module">
+    const GAID = /* @__PURE__ */ JSON.parse(JSON.stringify({GAID: String({GAID})})).GAID || {GAID};
+    const KEY = 'consent.analytics';
+    const DNT = navigator.doNotTrack === '1' || window.doNotTrack === '1';
+    const saved = (()=>{ try { return localStorage.getItem(KEY); } catch { return null; } })();
+    const defaultConsent = /* @__PURE__ */ JSON.parse(JSON.stringify({DEFAULT: String({DEFAULT})})).DEFAULT || {DEFAULT};
+    const consent = DNT ? 'denied' : (saved || defaultConsent);
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ window.dataLayer.push(arguments); }
+    window.gtag = gtag;
+    gtag('consent','default',{ ad_storage: consent, analytics_storage: consent });
+    gtag('js', new Date());
+    function loadGA(){
+      if (document.querySelector('script[src*="gtag/js?id="]')) return;
+      const s = document.createElement('script');
+      s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GAID;
+      document.head.appendChild(s);
+      gtag('config', GAID, { anonymize_ip: true });
     }
-  });
-})();
-</script>
+    if (consent !== 'denied') loadGA();
+    window.__setAnalyticsConsent = function(v){
+      try { localStorage.setItem(KEY, v); } catch {}
+      gtag('consent','update',{ ad_storage: v, analytics_storage: v });
+      if (v !== 'denied') loadGA();
+    };
+  </script>
+)}

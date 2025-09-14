@@ -1,34 +1,81 @@
 ---
-import MatchInsights from "../../components/tools/MatchInsights";
-import SiteHeader from "../../components/SiteHeader.astro";
-import Seo from "../../components/Seo.astro";
-const absUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://my-footy-site.pages.dev').toString();
+import AppLayout from '../../layouts/AppLayout.astro';
+const title = 'Match Insights · Footy Analytics';
+const jsonLd = {
+  "@context":"https://schema.org","@type":"SoftwareApplication","name":"Match Insights",
+  "applicationCategory":"SportsApplication","operatingSystem":"Web","url":Astro.request.url
+};
 ---
-<html lang="zh">
-  <head>
-    <meta charset="utf-8" />
-    <Seo
-      title="Match Insights · Footy Analytics"
-      description="一页闭环：Poisson 比分分布 → 公平赔率 → Kelly 资金管理。可复制摘要与导出 Top5 比分。"
-      url={absUrl}
-      type="website"
-    />
-  </head>
-  <body class="min-h-screen bg-neutral-50 text-neutral-900">
-    <SiteHeader />
-    <main class="max-w-5xl mx-auto px-4 py-8" role="main" aria-label="Match Insights tool page">
-      <h1 class="text-3xl font-bold mb-2">Match Insights</h1>
-      <p class="text-sm text-neutral-600 mb-6">Poisson → Fair odds → Kelly（单页闭环）。</p>
-      <!-- ★ 新增英文 SEO 描述（固定） -->
-      <section class="mt-1 text-sm text-neutral-600" data-seo-desc-en="match-insights">
-        End-to-end worksheet: Poisson scorelines → fair 1X2 odds (overround removed) → Kelly staking.
-        Includes a copy-ready text summary and CSV export of top scorelines.
-      </section>
+<AppLayout title={title} description="Poisson → Fair odds → Kelly（闭环）" jsonLd={jsonLd} active="insights">
+  <style>
+    :root { --w: 720px; }
+    section, .card{border:1px solid #eee;border-radius:12px;padding:1rem}
+    .mono{font-variant-numeric:tabular-nums;white-space:pre-wrap}
+    label{display:block;margin:.5rem 0 .25rem} input{width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    button{padding:.6rem .9rem;border-radius:.6rem;border:1px solid #ddd;background:#fafafa;cursor:pointer}
+    h2{margin-top:1.2rem}
+    .note{color:#666}
+  </style>
 
-      <MatchInsights client:visible />
-      <section class="mt-8 text-sm text-neutral-600" aria-label="Disclaimer">
-        本工具仅用于学习与模型演示，不构成任何投注建议。请理性参与，风险自负。
-      </section>
-    </main>
-  </body>
-</html>
+  <h1>Match Insights</h1>
+
+  <form id="f" class="card grid" onsubmit="return false;">
+    <div>
+      <label>λ(Home)</label><input id="lh" inputmode="decimal" value="1.45"/>
+      <label>λ(Away)</label><input id="la" inputmode="decimal" value="1.20"/>
+      <label>Max goals K（0..K）</label><input id="K" inputmode="numeric" value="8"/>
+      <label>Bankroll</label><input id="bank" inputmode="decimal" value="1000"/>
+      <label>单注上限（比例，默认10%）</label><input id="cap" inputmode="decimal" value="0.10"/>
+    </div>
+    <div>
+      <label>Market odds - Home</label><input id="oh" value="2.10"/>
+      <label>Market odds - Draw</label><input id="od" value="3.40"/>
+      <label>Market odds - Away</label><input id="oa" value="3.60"/>
+      <div style="margin-top:1rem;display:flex;gap:.6rem;flex-wrap:wrap">
+        <button id="calc">Calculate</button><button id="copy">复制摘要</button><button id="csv">导出 Top5 CSV</button>
+      </div>
+    </div>
+  </form>
+
+  <section class="card"><h2>Model 1X2（Poisson ⟶ 归一）</h2>
+    <div class="mono" id="modelLine"></div><div class="mono" id="fairLine"></div><div class="mono" id="tops"></div>
+  </section>
+
+  <section class="card"><h2>Market vs Model（含 Kelly）</h2>
+    <div class="mono" id="marketLine"></div><div class="mono" id="kellyLine"></div>
+    <small class="note">当无优势时 Kelly=0；用单注上限控制 Half/Quarter Kelly。</small>
+  </section>
+
+  <script type="module">
+    import { parseOdds, fairFromBook, fmtPct, fmtOdds } from '../../lib/odds.ts';
+    import { scoreMatrix, probs1x2, topScorelines } from '../../lib/poisson.ts';
+    import { kellyFrac, stake } from '../../lib/kelly.ts';
+    import { copy as copyTxt, downloadCSV } from '../../lib/share.ts';
+    const $ = (id)=>document.getElementById(id), toNumber=(s)=>Number(String(s).replace(',', '.'));
+    function calc(){
+      const lh=toNumber($('lh').value), la=toNumber($('la').value), K=Math.max(0, parseInt($('K').value||'8'));
+      const bank=toNumber($('bank').value), cap=toNumber($('cap').value||'0.10')||0.10;
+      const oh=parseOdds($('oh').value), od=parseOdds($('od').value), oa=parseOdds($('oa').value);
+      const { mat } = scoreMatrix(lh, la, K); const model = probs1x2(mat); const fair = {H:1/model.H,D:1/model.D,A:1/model.A};
+      $('modelLine').textContent=`Model prob  H ${fmtPct(model.H)} · D ${fmtPct(model.D)} · A ${fmtPct(model.A)}`;
+      $('fairLine').textContent =`Model fair  H ${fmtOdds(fair.H)} · D ${fmtOdds(fair.D)} · A ${fmtOdds(fair.A)}`;
+      const tops = topScorelines(mat,5).map(x=>`Home ${x.h}-${x.a} Away ${fmtPct(x.p)}`).join('\n');
+      $('tops').textContent='Top scorelines\n'+tops;
+      const { overround } = fairFromBook([oh,od,oa]);
+      $('marketLine').textContent=`Market odds  H ${fmtOdds(oh)} · D ${fmtOdds(od)} · A ${fmtOdds(oa)}   Overround ${(overround*100).toFixed(2)}%`;
+      const kH=stake(bank,kellyFrac(model.H,oh),cap), kD=stake(bank,kellyFrac(model.D,od),cap), kA=stake(bank,kellyFrac(model.A,oa),cap);
+      $('kellyLine').textContent=`Kelly stake(¥)  H ${kH.toFixed(2)} · D ${kD.toFixed(2)} · A ${kA.toFixed(2)}   (cap ${(cap*100).toFixed(0)}%)`;
+      return { lh,la,K,bank,cap,oh,od,oa,model,overround,topsArr: topScorelines(mat,5) };
+    }
+    $('calc').addEventListener('click',()=>calc());
+    $('copy').addEventListener('click',async()=>{ const r=calc(); const text=[
+      `λ(H)=${r.lh}, λ(A)=${r.la}, K=${r.K}`,
+      `Model prob H ${fmtPct(r.model.H)} · D ${fmtPct(r.model.D)} · A ${fmtPct(r.model.A)}`,
+      `Market odds H ${fmtOdds(r.oh)} · D ${fmtOdds(r.od)} · A ${fmtOdds(r.oa)} · Overround ${(r.overround*100).toFixed(2)}%`,
+      'Top scorelines: '+r.topsArr.map(x=>`${x.h}-${x.a} ${fmtPct(x.p)}`).join(', ')
+    ].join('\n'); await copyTxt(text); alert('已复制摘要'); });
+    $('csv').addEventListener('click',()=>{ const r=calc(); const rows=[['home','away','prob']]; r.topsArr.forEach(x=>rows.push([x.h,x.a,(x.p*100).toFixed(2)+'%'])); downloadCSV('top-scorelines.csv',rows); });
+    calc();
+  </script>
+</AppLayout>

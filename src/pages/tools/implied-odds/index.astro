@@ -1,0 +1,47 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+const title = 'Implied Odds · Footy Analytics';
+const jsonLd = {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Implied Odds","applicationCategory":"SportsApplication","operatingSystem":"Web","url":Astro.request.url};
+---
+<AppLayout title={title} description="从市场赔率计算隐含概率、归一化与公平赔率" jsonLd={jsonLd} active="implied">
+  <style>
+    :root{--w:720px}
+    .card{border:1px solid #eee;border-radius:12px;padding:1rem}
+    table{border-collapse:collapse;width:100%} th,td{border-bottom:1px solid #eee;padding:.5rem;text-align:left}
+    button{padding:.5rem .8rem;border:1px solid #ddd;border-radius:.6rem;background:#fafafa;cursor:pointer}
+    input{width:100%;padding:.45rem .6rem;border:1px solid #ddd;border-radius:.5rem}
+    .row{display:grid;grid-template-columns:1fr 120px 40px;gap:.5rem;align-items:center;margin:.4rem 0}
+  </style>
+
+  <h1>Implied Odds</h1>
+  <div class="card">
+    <div id="rows"></div>
+    <div style="display:flex;gap:.6rem;margin-top:.6rem">
+      <button id="add">+ 添加项</button><button id="calc">Calculate</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h2>结果</h2>
+    <table><thead><tr><th>#</th><th>Odds</th><th>Implied</th><th>Fair Prob</th><th>Fair Odds</th></tr></thead><tbody id="tb"></tbody></table>
+    <div id="ovr" style="margin-top:.6rem;color:#666"></div>
+  </div>
+
+  <script type="module">
+    import { parseOdds, fairFromBook, fmtPct, fmtOdds } from '../../../lib/odds.ts';
+    const rows = document.getElementById('rows'); const tb = document.getElementById('tb'); const ovr = document.getElementById('ovr');
+    function addRow(val='2.00'){ const d=document.createElement('div'); d.className='row';
+      d.innerHTML = `<input value="${val}"/><div></div><button aria-label="删除">×</button>`; rows.appendChild(d);
+      d.querySelector('button')!.onclick=()=>d.remove();
+    }
+    document.getElementById('add')!.addEventListener('click',()=>addRow('3.00'));
+    ['2.10','3.40','3.60'].forEach(addRow);
+    function calc(){
+      const odds = [...rows.querySelectorAll('input')].map(i=>parseOdds((i as HTMLInputElement).value)).filter(Boolean);
+      const { fairProb, fairOdds, overround } = fairFromBook(odds);
+      tb.innerHTML = odds.map((o,i)=>`<tr><td>${i+1}</td><td>${fmtOdds(o)}</td><td>${fmtPct(1/o)}</td><td>${fmtPct(fairProb[i])}</td><td>${fmtOdds(fairOdds[i])}</td></tr>`).join('');
+      ovr.textContent = `Overround: ${(overround*100).toFixed(2)}%`;
+    }
+    document.getElementById('calc')!.addEventListener('click',calc); calc();
+  </script>
+</AppLayout>

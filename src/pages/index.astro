@@ -1,40 +1,61 @@
 ---
-import SiteHeader from '../components/SiteHeader.astro';
-import Seo from '../components/Seo.astro';
-const cards = [
-  { href: '/tools/match-insights/', title: 'Match Insights', desc: 'Poisson → 公平赔率 → Kelly，一页闭环。' },
-  { href: '/tools/poisson/',        title: 'Poisson',         desc: 'λ 驱动比分分布与 Top Scorelines。' },
-  { href: '/tools/implied-odds/',   title: 'Implied Odds',    desc: '去水位，得到公平概率/赔率。' },
-  { href: '/tools/kelly/',          title: 'Kelly',           desc: '按模型优势与资金管理计算注额。' },
-  { href: '/articles/',             title: 'Articles',        desc: '模型、赔率、资金管理文章合集。' },
-  { href: '/tags/',                 title: 'Tags',            desc: '按主题浏览文章与工具示例。' },
-];
-const absUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://my-footy-site.pages.dev').toString();
+import AppLayout from '../layouts/AppLayout.astro';
+
+const title = 'Footy Analytics · Tools & Notes';
+const jsonLd = {
+  "@context":"https://schema.org",
+  "@type":"WebSite",
+  "name":"Footy Analytics",
+  "url": Astro.request.url
+};
 ---
-<html lang="zh">
-  <head>
-    <meta charset="utf-8" />
-    <Seo
-      title="Footy Analytics · Football odds tools & notes"
-      description="免费足球分析工具：泊松比分、去水位得到公平赔率、Kelly 资金管理，并配套文章示例。"
-      url={absUrl}
-    />
-  </head>
-  <body class="min-h-screen bg-neutral-50 text-neutral-900">
-    <SiteHeader />
-    <main class="max-w-5xl mx-auto px-4 py-10" role="main">
-      <section class="mb-8">
-        <h1 class="text-3xl font-bold">Football Tools & Notes</h1>
-        <p class="text-neutral-600 mt-2">从比分分布到公平赔率，再到 Kelly 资金管理——轻量但实用的分析链路。</p>
-      </section>
-      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((c) => (
-          <a href={c.href} class="block p-5 rounded-2xl bg-white border shadow-sm hover:shadow-md transition">
-            <h3 class="text-lg font-semibold">{c.title}</h3>
-            <p class="text-sm text-neutral-600 mt-1">{c.desc}</p>
-          </a>
-        ))}
-      </section>
-    </main>
-  </body>
-</html>
+<AppLayout title={title} description="轻量、可复用的足球模型工具：Poisson、Implied Odds、Kelly" jsonLd={jsonLd} active="home">
+  <style>
+    :root{--w:880px}
+    h1{font-size:2rem;margin-bottom:.5rem}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-top:1rem}
+    .card{border:1px solid #eee;border-radius:12px;padding:1rem;text-decoration:none;color:inherit}
+    .card:hover{box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    small{color:#666}
+    header{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem}
+  </style>
+
+  <header>
+    <img alt="logo" src="/og-default.svg" width="28" height="28" />
+    <strong>Footy Analytics</strong>
+  </header>
+
+  <h1>工具导航</h1>
+  <p>Poisson → Fair Odds → Kelly，一个思路跑通三页工具。</p>
+
+  <div class="grid">
+    <a class="card" href="/tools/match-insights/">
+      <h3>Match Insights ↗</h3>
+      <p>λ 输入 → 比分矩阵 → 1X2 概率/公平赔率 → Kelly 建议。</p>
+      <small>闭环演示页</small>
+    </a>
+    <a class="card" href="/tools/implied-odds/">
+      <h3>Implied Odds ↗</h3>
+      <p>从任意 N 项市场赔率，计算隐含概率、归一化与公平赔率。</p>
+      <small>适配十进制/美式/分数盘</small>
+    </a>
+    <a class="card" href="/tools/kelly/">
+      <h3>Kelly ↗</h3>
+      <p>给定 p 与赔率，批量算 Kelly 比例与下注额（含单注上限）。</p>
+      <small>支持 bankroll 与 cap</small>
+    </a>
+  </div>
+
+  <h2 style="margin-top:2rem">说明</h2>
+  <ul>
+    <li>所有计算在浏览器本地完成，零第三方依赖。</li>
+    <li>工具仅用于学习演示，不构成任何投注建议。</li>
+  </ul>
+</AppLayout>
+
+  <div style="height:1rem"></div>
+  <a class="card" href="/articles/">
+    <h3>Articles ↗</h3>
+    <p>模型笔记与使用示例。</p>
+    <small>站内文档</small>
+  </a>

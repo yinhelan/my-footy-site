@@ -1,0 +1,67 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+
+// 读取上级目录下的所有 Markdown 文章
+const modules = import.meta.glob('../*.md', { eager: true });
+
+// URL 中的 tag
+interface Params { tag: string }
+const { tag: tagParam } = Astro.params as Params;
+const activeTag = decodeURIComponent(tagParam);
+
+// 收集文章
+type Post = { url: string; title: string; description?: string; date?: string; tags?: string[]; };
+const postsAll: Post[] = Object.entries(modules).map(([p, mod]: any) => {
+  const fm = (mod as any).frontmatter || {};
+  const url = p.replace('../','/articles/').replace(/\.md$/, '/');
+  return { url, title: fm.title || url, description: fm.description, date: fm.date, tags: fm.tags || [] };
+});
+
+// 过滤当前标签
+const norm = (s:string)=>s.trim().toLowerCase();
+const posts = postsAll.filter(p => (p.tags||[]).some(t => norm(t) === norm(activeTag)))
+                      .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+// Schema
+const title = `Tag: ${activeTag} · Articles`;
+const jsonLd = {
+  "@context":"https://schema.org","@type":"CollectionPage","name":`Tag: ${activeTag}`,"inLanguage":"zh-CN","url":Astro.request.url
+};
+
+// 生成所有标签路径（静态导出）
+export async function getStaticPaths() {
+  const mods = import.meta.glob('../*.md', { eager: true }) as any;
+  const set = new Set<string>();
+  for (const [, m] of Object.entries(mods)) {
+    ((m as any).frontmatter?.tags || []).forEach((t:string)=> set.add(String(t)));
+  }
+  return Array.from(set).map((t) => ({
+    params: { tag: encodeURIComponent(t) },
+    props: {}
+  }));
+}
+---
+<AppLayout title={title} description={`包含标签「${activeTag}」的文章`} jsonLd={jsonLd}>
+  <style>
+    .list{max-width:860px;margin:0 auto}
+    .item{padding:14px 0;border-bottom:1px solid #eee}
+    .item h3{margin:0 0 .25rem 0}
+    .meta{color:#666;font-size:.95rem}
+    a{text-decoration:none;color:inherit} a:hover h3{text-decoration:underline}
+    .crumbs{color:#666;margin:.5rem 0 1rem}
+  </style>
+
+  <h1>Tag: {activeTag}</h1>
+  <div class="crumbs"><a href="/articles/">Articles</a> / <a href="/articles/tags/">Tags</a> / {activeTag}</div>
+
+  <div class="list">
+    {posts.length === 0 && <p>暂无包含该标签的文章。</p>}
+    {posts.map(p => (
+      <div class="item">
+        <a href={p.url}><h3>{p.title}</h3></a>
+        {p.description && <p>{p.description}</p>}
+        <div class="meta">{p.date && <>发布：{new Date(p.date).toLocaleDateString('zh-CN')}</>}</div>
+      </div>
+    ))}
+  </div>
+</AppLayout>
