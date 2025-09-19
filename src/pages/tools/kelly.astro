@@ -1,0 +1,205 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import HistoryPicker from '../../components/HistoryPicker.astro';
+
+const meta = {
+  title: 'Kelly Calculator',
+  description: 'Full/Half/Quarter Kelly; optional bankroll sizing.',
+  lang: 'en'
+};
+---
+<BaseLayout {...meta}>
+  <h1 style="margin:.2rem 0">Kelly Calculator</h1>
+  <div class="page-actions" style="display:flex;gap:8px;margin:12px 0">
+    <button type="button" class="btn" id="btn-fill-example" data-testid="fill-example">填充示例</button>
+  </div>
+
+  <form id="tool-form" style="display:grid;gap:10px;max-width:680px">
+    <style>
+      .field-error{display:block;color:#d32f2f;font-size:.75rem;margin-top:4px;}
+      .btn[disabled]{opacity:.6;cursor:not-allowed;}
+    </style>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <label style="display:flex;flex-direction:column;gap:4px">赔率 (decimal)
+        <input name="odds" type="number" step="0.01" placeholder="1.95">
+        <small class="field-error" data-error-for="odds"></small>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px">自估胜率 p (0~1 或 %)
+        <input name="p" type="number" step="0.01" placeholder="0.54">
+        <small class="field-error" data-error-for="p"></small>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px">Bankroll（可选）
+        <input name="bankroll" type="number" step="1" placeholder="1000">
+        <small class="field-error" data-error-for="bankroll"></small>
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" id="btn-calc" class="btn">Calculate</button>
+      <button type="button" id="btn-share"   class="btn">Share link</button>
+      <button type="button" id="btn-history" class="btn">历史数据</button>
+      <button type="reset"  class="btn">Reset</button>
+    </div>
+  </form>
+
+  <div id="out" class="card" style="margin-top:12px"></div>
+
+  <script type="module">
+    import { makeShareUrl, readParams, normalizeDecimal } from '../../lib/share.ts';
+    import { required, isNumber, inRange, compose } from '../../lib/validate.ts';
+
+    const form = document.getElementById('tool-form');
+    const out  = document.getElementById('out');
+    const shareBtn = document.getElementById('btn-share');
+    const calcBtn = document.getElementById('btn-calc');
+    const fillBtn = document.getElementById('btn-fill-example');
+
+    const emit = (event, detail = {}) => {
+      window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'kelly', ...detail } }));
+    };
+
+    const validators = {
+      odds: compose(required('请输入赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')),
+      p: compose(required('请输入自估胜率'), isNumber(), inRange(0.01, 100, '范围 0.01~100')),
+      bankroll: compose(required('请输入 Bankroll'), isNumber(), inRange(1, 1000000, '范围 1~1000000')),
+    };
+    const touched = new Set();
+
+    const q = (sel) => form?.querySelector(sel);
+    const errorEl = (name) => form?.querySelector(`[data-error-for="${name}"]`);
+    const getValue = (name) => (q(`[name="${name}"]`)?.value ?? '').trim();
+
+    const setError = (name, result, force) => {
+      const el = errorEl(name);
+      if (el) el.textContent = !result.ok && (force || touched.has(name)) ? (result.msg ?? '') : '';
+    };
+
+    const validate = (force = false) => {
+      if (force) Object.keys(validators).forEach((name) => touched.add(name));
+      const allOk = Object.entries(validators).every(([name, validator]) => {
+        const result = validator(getValue(name));
+        setError(name, result, force);
+        return result.ok;
+      });
+      if (calcBtn instanceof HTMLButtonElement) calcBtn.disabled = !allOk;
+      if (shareBtn instanceof HTMLButtonElement) shareBtn.disabled = !allOk;
+      return allOk;
+    };
+
+    const num = (el) => {
+      const s = normalizeDecimal(el && el.value || '');
+      const n = Number(s);
+      return Number.isFinite(n) ? n : NaN;
+    };
+    const fmt = (x, d=2) => Number.isFinite(x) ? x.toFixed(d) : '—';
+
+    const calc = () => {
+      if (!validate(false)) {
+        if (out) out.textContent = '请输入正确的赔率、胜率和 bankroll';
+        return;
+      }
+      const oddsInput = q('[name="odds"]');
+      const probInput = q('[name="p"]');
+      const bankrollInput = q('[name="bankroll"]');
+      const o = num(oddsInput);
+      let p = num(probInput);
+      const br = num(bankrollInput);
+
+      if (p > 1) p = p/100;
+
+      const b = o - 1;
+      const qProb = 1 - p;
+      const k = (b*p - qProb) / b;
+      const kFull = Math.max(0, k);
+      const kHalf = kFull / 2;
+      const kQuarter = kFull / 4;
+
+      const stake = (ratio) => (Number.isFinite(br) && br>0) ? br * ratio : NaN;
+
+      if (out) {
+        out.innerHTML = `
+          <div style="display:grid;gap:6px">
+            <div>Kelly 比例：<b>${fmt(kFull*100,1)}%</b></div>
+            <div>Half Kelly：${fmt(kHalf*100,1)}%</div>
+            <div>Quarter Kelly：${fmt(kQuarter*100,1)}%</div>
+            ${Number.isFinite(br) && br>0 ? `
+              <hr style="border:none;border-top:1px dashed #e5e7eb">
+              <div>建议下注（基于 Bankroll = ${fmt(br,0)}）：</div>
+              <div>Full：${fmt(stake(kFull),0)}</div>
+              <div>Half：${fmt(stake(kHalf),0)}</div>
+              <div>Quarter：${fmt(stake(kQuarter),0)}</div>
+            ` : ''}
+          </div>`;
+      }
+    };
+
+    if (form) {
+      form.querySelectorAll('input').forEach((el) => {
+        el.addEventListener('input', () => {
+          touched.add(el.name);
+          if (validate(false)) calc();
+        });
+        el.addEventListener('blur', () => {
+          touched.add(el.name);
+          validate(false);
+        });
+      });
+      form.addEventListener('reset', () => {
+        setTimeout(() => {
+          touched.clear();
+          validate(false);
+          if (out) out.text内容 = '';
+        }, 0);
+      });
+    }
+
+    if (calcBtn instanceof HTMLButtonElement) {
+      calcBtn.disabled = true;
+      calcBtn.addEventListener('click', () => {
+        if (!validate(true)) return;
+        emit('calc_submit');
+        calc();
+      });
+    }
+
+    if (fillBtn) {
+      fillBtn.addEventListener('click', () => {
+        const setValue = (name, value) => {
+          const el = q(`[name="${name}"]`);
+          if (el instanceof HTMLInputElement) {
+            el.value = value;
+            touched.add(name);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        };
+        setValue('odds', '2.30');
+        setValue('p', '0.47');
+        setValue('bankroll', '1000');
+        emit('example_fill_click');
+        validate(true);
+        if (calcBtn instanceof HTMLButtonElement && !calcBtn.disabled) calcBtn.click();
+      });
+    }
+
+    shareBtn?.addEventListener('click', async () => {
+      if (!validate(true)) return;
+      const data = Object.fromEntries(new FormData(form));
+      const url = makeShareUrl(window.location.pathname, data);
+      try { await navigator.clipboard.writeText(url); alert('Share link copied!'); }
+      catch { window.prompt('Copy your share URL:', url); }
+    });
+
+    const state = readParams({ odds:'', p:'', bankroll:'' });
+    Object.entries(state).forEach(([k,v])=>{
+      const el = form.querySelector(`[name="${k}"]`);
+      if (el) {
+        el.value = String(v);
+        if (v) touched.add(k);
+      }
+    });
+    validate(false);
+    emit('tool_view');
+    if (!(calcBtn instanceof HTMLButtonElement) || !calcBtn.disabled) calc();
+  </script>
+
+  <HistoryPicker />
+</BaseLayout>

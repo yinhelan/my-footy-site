@@ -8,6 +8,9 @@ import MI_URL from '../../client/match-insights.client.js?url';
   <style>
     section, .card{border:1px solid #eee;border-radius:12px;padding:1rem}
     .mono{font-variant-numeric:tabular-nums;white-space:pre-wrap}
+    .field-error{display:block;color:#d32f2f;font-size:.75rem;margin-top:4px;}
+    .page-actions{display:flex;gap:8px;margin:12px 0;}
+    .btn[disabled]{opacity:.6;cursor:not-allowed;}
     label{display:block;margin:.5rem 0 .25rem} input{width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     button{padding:.6rem .9rem;border-radius:.6rem;border:1px solid #ddd;background:#fafafa;cursor:pointer}
@@ -15,18 +18,21 @@ import MI_URL from '../../client/match-insights.client.js?url';
   </style>
 
   <h1>Match Insights</h1>
+  <div class="page-actions">
+    <button type="button" class="btn" id="btn-fill-example" data-testid="fill-example">填充示例</button>
+  </div>
   <form id="f" class="card grid">
     <div>
-      <label>λ(Home)</label><input id="lh" inputmode="decimal" value="1.45"/>
-      <label>λ(Away)</label><input id="la" inputmode="decimal" value="1.20"/>
-      <label>Max goals K（0..K）</label><input id="K" inputmode="numeric" value="8"/>
-      <label>Bankroll</label><input id="bank" inputmode="decimal" value="1000"/>
-      <label>单注上限（比例，默认10%）</label><input id="cap" inputmode="decimal" value="0.10"/>
+      <label>λ(Home)<input id="lh" inputmode="decimal" value="1.45"/><small class="field-error" data-error-for="lh"></small></label>
+      <label>λ(Away)<input id="la" inputmode="decimal" value="1.20"/><small class="field-error" data-error-for="la"></small></label>
+      <label>Max goals K（0..K）<input id="K" inputmode="numeric" value="8"/><small class="field-error" data-error-for="K"></small></label>
+      <label>Bankroll<input id="bank" inputmode="decimal" value="1000"/><small class="field-error" data-error-for="bank"></small></label>
+      <label>单注上限（比例，默认10%）<input id="cap" inputmode="decimal" value="0.10"/><small class="field-error" data-error-for="cap"></small></label>
     </div>
     <div>
-      <label>Market odds - Home</label><input id="oh" value="2.10"/>
-      <label>Market odds - Draw</label><input id="od" value="3.40"/>
-      <label>Market odds - Away</label><input id="oa" value="3.60"/>
+      <label>Market odds - Home<input id="oh" value="2.10"/><small class="field-error" data-error-for="oh"></small></label>
+      <label>Market odds - Draw<input id="od" value="3.40"/><small class="field-error" data-error-for="od"></small></label>
+      <label>Market odds - Away<input id="oa" value="3.60"/><small class="field-error" data-error-for="oa"></small></label>
       <div style="margin-top:1rem;display:flex;gap:.6rem;flex-wrap:wrap">
         <button type="button" id="calc">Calculate</button>
         <button type="button" id="copy">复制摘要</button>
@@ -44,43 +50,99 @@ import MI_URL from '../../client/match-insights.client.js?url';
     <small style="color:#666">当无优势时 Kelly=0；用单注上限控制 Half/Quarter Kelly。</small>
   </section>
 
-<script type="module" src={MI_URL}></script>
+  <script type="module" src={MI_URL}></script>
 </AppLayout>
 
 <!-- lyra:tooling --><script src="/tooling.js" defer></script>
-<script is:inline>
-  (function () {
-    const emit = (event, detail = {}) => {
-      window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'match-insights', ...detail } }));
-    };
-
-    emit('tool_view', { tool: 'match-insights' });
-
-    const attach = () => {
-      document.getElementById('calc')?.addEventListener('click', () => emit('match_insights_calc_click'));
-      document.getElementById('copy')?.addEventListener('click', () => emit('match_insights_copy_summary'));
-      document.getElementById('csv')?.addEventListener('click', () => emit('match_insights_export_top5'));
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', attach, { once: true });
-    } else {
-      attach();
-    }
-  })();
-</script>
 <script type="module">
-  const btn = document.getElementById('btn-calculate');
-  btn?.addEventListener('click', () => {
-    // 这里放你的计算逻辑；先来个最小演示
-    try {
-      // 例：从表单读入两数相加
-      const a = Number((document.querySelector('[name="a"]') as HTMLInputElement)?.value || '0');
-      const b = Number((document.querySelector('[name="b"]') as HTMLInputElement)?.value || '0');
-      const out = document.getElementById('result') || (() => {
-        const d=document.createElement('div');d.id='result'; btn.after(d); return d;
-      })();
-      (out as HTMLElement).textContent = `Result: ${ (a + b).toFixed(2) }`;
-    } catch (e) { alert('计算失败：' + e); }
+  import { required, isNumber, inRange, compose } from '../../lib/validate.ts';
+
+  const form = document.getElementById('f');
+  const calcBtn = document.getElementById('calc');
+  const fillBtn = document.getElementById('btn-fill-example');
+  const emit = (event, detail = {}) => {
+    window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'match-insights', ...detail } }));
+  };
+
+  const fields = [
+    { name: 'lh', el: document.getElementById('lh'), validator: compose(required('请输入 λ(Home)'), isNumber(), inRange(0, 6, '推荐范围 0~6')) },
+    { name: 'la', el: document.getElementById('la'), validator: compose(required('请输入 λ(Away)'), isNumber(), inRange(0, 6, '推荐范围 0~6')) },
+    { name: 'K', el: document.getElementById('K'), validator: compose(required('请输入 K'), isNumber(), inRange(0, 15, '范围 0~15')) },
+    { name: 'bank', el: document.getElementById('bank'), validator: compose(required('请输入 Bankroll'), isNumber(), inRange(1, 1000000, '范围 1~1000000')) },
+    { name: 'cap', el: document.getElementById('cap'), validator: compose(required('请输入 单注上限'), isNumber(), inRange(0.01, 1, '范围 0.01~1')) },
+    { name: 'oh', el: document.getElementById('oh'), validator: compose(required('请输入 主胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
+    { name: 'od', el: document.getElementById('od'), validator: compose(required('请输入 平赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
+    { name: 'oa', el: document.getElementById('oa'), validator: compose(required('请输入 客胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
+  ];
+  const touched = new Set();
+
+  const errorEl = (name) => document.querySelector(`[data-error-for="${name}"]`);
+  const getValue = (el) => (el?.value ?? '').trim();
+
+  const validateField = (field, force = false) => {
+    const value = getValue(field.el);
+    if (force) touched.add(field.name);
+    const result = field.validator(value);
+    const el = errorEl(field.name);
+    if (el) {
+      el.textContent = !result.ok && (force || touched.has(field.name)) ? (result.msg ?? '') : '';
+    }
+    return result.ok;
+  };
+
+  const refresh = (force = false) => {
+    const allOk = fields.every((field) => validateField(field, force));
+    if (calcBtn instanceof HTMLButtonElement) calcBtn.disabled = !allOk;
+    return allOk;
+  };
+
+  fields.forEach(({ name, el }) => {
+    if (!el) return;
+    ['input', 'blur'].forEach((evt) => {
+      el.addEventListener(evt, () => {
+        touched.add(name);
+        refresh(false);
+      });
+    });
   });
+
+  if (calcBtn instanceof HTMLButtonElement) {
+    calcBtn.disabled = true;
+    calcBtn.addEventListener('click', (event) => {
+      if (!refresh(true)) {
+        event.preventDefault();
+        return;
+      }
+      emit('calc_submit');
+    });
+  }
+
+  if (fillBtn) {
+    fillBtn.addEventListener('click', () => {
+      const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLInputElement) {
+          el.value = value;
+          touched.add(id);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      };
+      setValue('lh', '1.45');
+      setValue('la', '1.10');
+      setValue('K', '8');
+      setValue('bank', '1000');
+      setValue('cap', '0.50');
+      setValue('oh', '2.30');
+      setValue('od', '3.30');
+      setValue('oa', '3.10');
+      emit('example_fill_click');
+      if (calcBtn instanceof HTMLButtonElement) {
+        refresh(true);
+        if (!calcBtn.disabled) calcBtn.click();
+      }
+    });
+  }
+
+  emit('tool_view');
+  refresh(false);
 </script>
