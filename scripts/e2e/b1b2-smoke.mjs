@@ -92,31 +92,40 @@ async function run() {
       if (overlay) overlay.remove();
     }).catch(()=>{});
 
+    await page.waitForFunction(() => typeof window.__implied_calc__ === 'function', null, { timeout: 5000 });
+
     const fillBtn = page.locator('[data-testid="fill-example"]').first();
-    await fillBtn.scrollIntoViewIfNeeded().catch(()=>{});
-    await fillBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(()=>{});
+    if (await fillBtn.count()) {
+      await fillBtn.scrollIntoViewIfNeeded().catch(()=>{});
+      await fillBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(()=>{});
+      await fillBtn.click().catch(()=>{});
+    }
 
-    const ensureTable = async () => {
-      await page.fill('textarea#odds', '2.30,3.30,3.10').catch(()=>{});
-      const calc = page.locator('#btn-calc');
-      if (await calc.count()) {
-        await page.evaluate(() => {
-          const btn = document.getElementById('btn-calc');
-          if (btn) btn.removeAttribute('disabled');
-        }).catch(()=>{});
-        await calc.click().catch(()=>{});
-      }
-      await page.evaluate(() => {
-        try { window.__implied_calc__ && window.__implied_calc__(); } catch {}
-      }).catch(()=>{});
-    };
+    await page.fill('textarea#odds', '2.30,3.30,3.10').catch(()=>{});
+    await page.selectOption('#format', 'decimal').catch(()=>{});
+    await page.selectOption('#method', 'power').catch(()=>{});
 
-    await fillBtn.click().catch(()=>{});
-    await ensureTable();
-    await page.waitForSelector('#out table', { timeout: 4000 }).catch(async () => {
-      await ensureTable();
-      await page.waitForSelector('#out table', { timeout: 4000 }).catch(()=>{});
-    });
+    await page.evaluate(() => {
+      try { window.__implied_calc__ && window.__implied_calc__(); } catch {}
+    }).catch(()=>{});
+    await page.waitForSelector('#out table', { timeout: 4000 });
+
+    const fair1Text = await page.locator('#out tbody tr:nth-child(1) td:nth-child(4)').innerText();
+    const fair1 = Number.parseFloat(fair1Text);
+
+    await page.selectOption('#method', 'multiplicative').catch(()=>{});
+    await page.evaluate(() => {
+      try { window.__implied_calc__ && window.__implied_calc__(); } catch {}
+    }).catch(()=>{});
+
+    const fair2Text = await page.locator('#out tbody tr:nth-child(1) td:nth-child(4)').innerText();
+    const fair2 = Number.parseFloat(fair2Text);
+    if (!(Number.isFinite(fair1) && Number.isFinite(fair2))) {
+      throw new Error(`fair values invalid: ${fair1Text} -> ${fair2Text}`);
+    }
+    if (Math.abs(fair1 - fair2) <= 1e-9) {
+      throw new Error(`expected method change to alter fair: ${fair1} vs ${fair2}`);
+    }
 
     const table = await page.locator('#out table').first();
     const ok = await table.count().catch(()=>0) > 0;
@@ -126,8 +135,10 @@ async function run() {
           .slice(0, 4)
           .join(' ')
       : 'SKIP: #out table not found';
+    await page.waitForSelector('#btn-export-csv', { timeout: 2000 }).catch(()=>{});
+    const exportBtnExists = (await page.locator('#btn-export-csv').count().catch(()=>0)) > 0;
     await page.close();
-    return { case: 'B1-implied', ok, snippet };
+    return { case: 'B1-implied', ok, snippet, fair1, fair2, exportBtnExists };
   }));
 
   // B1: Kelly

@@ -1,6 +1,5 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import ResultsExport from '../../components/ResultsExport.astro';
 
 const meta = {
   title: 'Implied → Fair Odds',
@@ -51,87 +50,80 @@ const meta = {
 
   <div id="out" class="card" style="margin-top:12px"></div>
 
-  <ResultsExport />
-
   <script type="module">
     import { devig } from '/src/lib/odds/devig.ts';
     import { toDecimal } from '/src/lib/odds/format.ts';
 
-    const oddsInput = document.querySelector('textarea#odds');
-    const formatSelect = document.getElementById('format');
-    const methodSelect = document.getElementById('method');
-    const calcBtn = document.getElementById('btn-calc');
-    const fillBtn = document.getElementById('btn-fill-example');
-    const exportBtn = document.getElementById('btn-export-csv');
-    const out = document.getElementById('out');
-
-    let lastRows = [];
-
-    function renderTable(decimals, raw, fair, method, overround) {
-      const header = ['#', 'Decimal Odds', 'Raw Prob', 'Fair Prob', 'Method'];
-      const body = decimals
-        .map((odds, index) =>
-          `<tr><td>${index + 1}</td><td>${odds.toFixed(6)}</td><td>${raw[index].toFixed(6)}</td><td>${fair[index].toFixed(6)}</td><td>${method}</td></tr>`
-        )
-        .join('');
-      return `<div style="overflow:auto"><table style="border-collapse:collapse;min-width:520px">`
-        + `<thead><tr>${header.map((h) => `<th style="text-align:left;padding:6px 8px;color:#64748B;font-weight:600">${h}</th>`).join('')}</tr></thead>`
-        + `<tbody>${body}</tbody>`
-        + `<tfoot><tr><td colspan="5">overround: ${overround.toFixed(6)}</td></tr></tfoot>`
-        + `</table></div>`;
-    }
-
-    function calc() {
-      if (!(oddsInput instanceof HTMLTextAreaElement) || !out) return;
-      const format = (formatSelect instanceof HTMLSelectElement ? formatSelect.value : 'decimal');
-      const method = (methodSelect instanceof HTMLSelectElement ? methodSelect.value : 'power');
-      const decimals = toDecimal(format, oddsInput.value);
-      if (!decimals.length) {
+    function compute() {
+      const fmt = (document.getElementById('format')?.value) || 'decimal';
+      const method = (document.getElementById('method')?.value) || 'power';
+      const input = (document.getElementById('odds')?.value) || '';
+      let oddsDec = [];
+      try {
+        oddsDec = toDecimal(fmt, input);
+      } catch (error) {
+        console.error('format parse failed', error);
+        oddsDec = [];
+      }
+      const out = document.getElementById('out');
+      if (!out) return;
+      if (oddsDec.length < 2) {
         out.textContent = '请输入有效赔率（至少 2 项）';
-        lastRows = [];
         return;
       }
-      try {
-        const { overround, raw, fair } = devig(method, decimals);
-        out.innerHTML = renderTable(decimals, raw, fair, method, overround);
-        lastRows = decimals.map((odds, index) => ({
-          market: 'list',
-          outcome: `#${index + 1}`,
-          odds_decimal: odds.toFixed(6),
-          raw_prob: raw[index].toFixed(6),
-          method,
-          fair_prob: fair[index].toFixed(6),
-          overround: overround.toFixed(6)
-        }));
-      } catch (error) {
-        out.textContent = (error instanceof Error) ? error.message : '计算失败';
-        lastRows = [];
+
+      const { overround, raw, fair } = devig(method, oddsDec);
+      const rows = oddsDec.map((o, i) => ({
+        market: '1x2',
+        outcome: i + 1,
+        odds_decimal: o.toFixed(2),
+        raw_prob: raw[i].toFixed(6),
+        method,
+        fair_prob: fair[i].toFixed(6),
+        overround: overround.toFixed(6),
+      }));
+
+      const trs = rows
+        .map((r) => `<tr><td>${r.outcome}</td><td>${r.odds_decimal}</td><td>${r.raw_prob}</td><td>${r.fair_prob}</td></tr>`)
+        .join('');
+      out.innerHTML = `<table><thead><tr><th>#</th><th>odds</th><th>raw</th><th>fair</th></tr></thead>
+        <tbody>${trs}</tbody><tfoot><tr><td colspan="4">overround: ${overround.toFixed(6)} (${method})</td></tr></tfoot></table>`;
+
+      let host = document.getElementById('export-host');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'export-host';
+        out.after(host);
       }
+      import('/src/lib/react/renderResultsExport.tsx')
+        .then((m) => {
+          m.renderResultsExport(host, {
+            headers: ['market', 'outcome', 'odds_decimal', 'raw_prob', 'method', 'fair_prob', 'overround'],
+            rows,
+            filename: 'implied.csv',
+          });
+        })
+        .catch((err) => console.error('export mount failed', err));
     }
 
-    window.__implied_calc__ = calc;
-
-    calcBtn?.addEventListener('click', calc);
-
-    fillBtn?.addEventListener('click', () => {
-      if (oddsInput instanceof HTMLTextAreaElement) oddsInput.value = '2.30,3.30,3.10';
-      calc();
+    const btn = document.getElementById('btn-calc');
+    if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); compute(); });
+    const fillBtn = document.getElementById('btn-fill-example');
+    if (fillBtn) fillBtn.addEventListener('click', () => {
+      const oddsEl = document.getElementById('odds');
+      if (oddsEl instanceof HTMLTextAreaElement && !oddsEl.value) oddsEl.value = '2.30,3.30,3.10';
+      compute();
+    });
+    const fmtSel = document.getElementById('format');
+    if (fmtSel) fmtSel.addEventListener('change', compute);
+    const methodSel = document.getElementById('method');
+    if (methodSel) methodSel.addEventListener('change', () => {
+      window.dispatchEvent(new CustomEvent('analytics', { detail: { event: 'devig_method_change', tool: 'implied', to: methodSel.value } }));
+      compute();
     });
 
-    exportBtn?.addEventListener('click', () => {
-      if (!lastRows.length) return;
-      const headers = ['market', 'outcome', 'odds_decimal', 'raw_prob', 'method', 'fair_prob', 'overround'];
-      const csv = [headers.join(','), ...lastRows.map(row => headers.map((h) => row[h]).join(','))].join('
-');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'implied-odds.csv';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    });
-
-    calc();
+    window.__implied_calc__ = compute;
+    compute();
   </script>
-
 </BaseLayout>
+<script type="module" src="/src/client/inline/implied-fallback.js"></script>
