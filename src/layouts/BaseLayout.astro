@@ -1,44 +1,53 @@
 ---
 export interface Props {
-  title?: string;
-  description?: string;
-  lang?: string;           // 'en' / 'zh-CN' …
-  noindex?: boolean;
-  ogImage?: string;        // 如 '/og/poisson.png'
+  title?: string; description?: string; lang?: string;
+  canonical?: string; ogImage?: string; noindex?: boolean; siteName?: string;
 }
-const { title, description, lang = 'en', noindex = false, ogImage } = Astro.props;
+const {
+  title = 'Footy Analytics',
+  description = '',
+  lang = 'en',
+  canonical = '',
+  ogImage = '',
+  noindex = false,
+  siteName = 'Footy Analytics'
+} = Astro.props;
 
-const siteName = 'Footy Analytics';
-const pageTitle = title ? `${title} | ${siteName}` : siteName;
-// Astro.url 仅在 .astro 布局可用
-const canonical = Astro.url ? Astro.url.href : undefined;
+const analyticsScript = analyticsAdapter();
+
+import Header from '../components/Header.astro';
+import TopTicker from '../components/TopTicker.astro';
+import RealtimeSidebar from '../components/RealtimeSidebar.astro';
+import analyticsAdapter from '../components/AnalyticsAdapter.ts';
 ---
 <!doctype html>
 <html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{pageTitle}</title>
-
+    <title>{title}</title>
     {description && <meta name="description" content={description} />}
     {canonical && <link rel="canonical" href={canonical} />}
     {noindex && <meta name="robots" content="noindex,nofollow" />}
-
-    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={siteName} />
-    <meta property="og:title" content={pageTitle} />
+    <meta property="og:title" content={title} />
     {description && <meta property="og:description" content={description} />}
     {canonical && <meta property="og:url" content={canonical} />}
     {ogImage && <meta property="og:image" content={ogImage} />}
-
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-
-    <!-- RSS（若已启用） -->
+    <link rel="stylesheet" href="/_theme.css" />
     <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />
   </head>
   <body>
-    <slot />
+    <Header />
+    <TopTicker />
+    <main class="container layout" style="margin:16px auto">
+      <section>
+        <!-- 关键：这里一定要有 slot -->
+        <slot />
+      </section>
+      <RealtimeSidebar />
+    </main>
   </body>
 </html>

@@ -1,26 +1,21 @@
 ---
 import AppLayout from '../../layouts/AppLayout.astro';
 const title = 'Match Insights · Footy Analytics';
-const jsonLd = {
-  "@context":"https://schema.org","@type":"SoftwareApplication","name":"Match Insights",
-  "applicationCategory":"SportsApplication","operatingSystem":"Web","url":Astro.request.url
-};
+const jsonLd = { "@context":"https://schema.org","@type":"SoftwareApplication","name":"Match Insights","applicationCategory":"SportsApplication","operatingSystem":"Web","url":Astro.request.url };
+import MI_URL from '../../client/match-insights.client.js?url';
 ---
 <AppLayout title={title} description="Poisson → Fair odds → Kelly（闭环）" jsonLd={jsonLd} active="insights">
   <style>
-    :root { --w: 720px; }
     section, .card{border:1px solid #eee;border-radius:12px;padding:1rem}
     .mono{font-variant-numeric:tabular-nums;white-space:pre-wrap}
     label{display:block;margin:.5rem 0 .25rem} input{width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     button{padding:.6rem .9rem;border-radius:.6rem;border:1px solid #ddd;background:#fafafa;cursor:pointer}
     h2{margin-top:1.2rem}
-    .note{color:#666}
   </style>
 
   <h1>Match Insights</h1>
-
-  <form id="f" class="card grid" onsubmit="return false;">
+  <form id="f" class="card grid">
     <div>
       <label>λ(Home)</label><input id="lh" inputmode="decimal" value="1.45"/>
       <label>λ(Away)</label><input id="la" inputmode="decimal" value="1.20"/>
@@ -33,7 +28,9 @@ const jsonLd = {
       <label>Market odds - Draw</label><input id="od" value="3.40"/>
       <label>Market odds - Away</label><input id="oa" value="3.60"/>
       <div style="margin-top:1rem;display:flex;gap:.6rem;flex-wrap:wrap">
-        <button id="calc">Calculate</button><button id="copy">复制摘要</button><button id="csv">导出 Top5 CSV</button>
+        <button type="button" id="calc">Calculate</button>
+        <button type="button" id="copy">复制摘要</button>
+        <button type="button" id="csv">导出 Top5 CSV</button>
       </div>
     </div>
   </form>
@@ -44,38 +41,46 @@ const jsonLd = {
 
   <section class="card"><h2>Market vs Model（含 Kelly）</h2>
     <div class="mono" id="marketLine"></div><div class="mono" id="kellyLine"></div>
-    <small class="note">当无优势时 Kelly=0；用单注上限控制 Half/Quarter Kelly。</small>
+    <small style="color:#666">当无优势时 Kelly=0；用单注上限控制 Half/Quarter Kelly。</small>
   </section>
 
-  <script type="module">
-    import { parseOdds, fairFromBook, fmtPct, fmtOdds } from '../../lib/odds.ts';
-    import { scoreMatrix, probs1x2, topScorelines } from '../../lib/poisson.ts';
-    import { kellyFrac, stake } from '../../lib/kelly.ts';
-    import { copy as copyTxt, downloadCSV } from '../../lib/share.ts';
-    const $ = (id)=>document.getElementById(id), toNumber=(s)=>Number(String(s).replace(',', '.'));
-    function calc(){
-      const lh=toNumber($('lh').value), la=toNumber($('la').value), K=Math.max(0, parseInt($('K').value||'8'));
-      const bank=toNumber($('bank').value), cap=toNumber($('cap').value||'0.10')||0.10;
-      const oh=parseOdds($('oh').value), od=parseOdds($('od').value), oa=parseOdds($('oa').value);
-      const { mat } = scoreMatrix(lh, la, K); const model = probs1x2(mat); const fair = {H:1/model.H,D:1/model.D,A:1/model.A};
-      $('modelLine').textContent=`Model prob  H ${fmtPct(model.H)} · D ${fmtPct(model.D)} · A ${fmtPct(model.A)}`;
-      $('fairLine').textContent =`Model fair  H ${fmtOdds(fair.H)} · D ${fmtOdds(fair.D)} · A ${fmtOdds(fair.A)}`;
-      const tops = topScorelines(mat,5).map(x=>`Home ${x.h}-${x.a} Away ${fmtPct(x.p)}`).join('\n');
-      $('tops').textContent='Top scorelines\n'+tops;
-      const { overround } = fairFromBook([oh,od,oa]);
-      $('marketLine').textContent=`Market odds  H ${fmtOdds(oh)} · D ${fmtOdds(od)} · A ${fmtOdds(oa)}   Overround ${(overround*100).toFixed(2)}%`;
-      const kH=stake(bank,kellyFrac(model.H,oh),cap), kD=stake(bank,kellyFrac(model.D,od),cap), kA=stake(bank,kellyFrac(model.A,oa),cap);
-      $('kellyLine').textContent=`Kelly stake(¥)  H ${kH.toFixed(2)} · D ${kD.toFixed(2)} · A ${kA.toFixed(2)}   (cap ${(cap*100).toFixed(0)}%)`;
-      return { lh,la,K,bank,cap,oh,od,oa,model,overround,topsArr: topScorelines(mat,5) };
-    }
-    $('calc').addEventListener('click',()=>calc());
-    $('copy').addEventListener('click',async()=>{ const r=calc(); const text=[
-      `λ(H)=${r.lh}, λ(A)=${r.la}, K=${r.K}`,
-      `Model prob H ${fmtPct(r.model.H)} · D ${fmtPct(r.model.D)} · A ${fmtPct(r.model.A)}`,
-      `Market odds H ${fmtOdds(r.oh)} · D ${fmtOdds(r.od)} · A ${fmtOdds(r.oa)} · Overround ${(r.overround*100).toFixed(2)}%`,
-      'Top scorelines: '+r.topsArr.map(x=>`${x.h}-${x.a} ${fmtPct(x.p)}`).join(', ')
-    ].join('\n'); await copyTxt(text); alert('已复制摘要'); });
-    $('csv').addEventListener('click',()=>{ const r=calc(); const rows=[['home','away','prob']]; r.topsArr.forEach(x=>rows.push([x.h,x.a,(x.p*100).toFixed(2)+'%'])); downloadCSV('top-scorelines.csv',rows); });
-    calc();
-  </script>
+<script type="module" src={MI_URL}></script>
 </AppLayout>
+
+<!-- lyra:tooling --><script src="/tooling.js" defer></script>
+<script is:inline>
+  (function () {
+    const emit = (event, detail = {}) => {
+      window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'match-insights', ...detail } }));
+    };
+
+    emit('tool_view', { tool: 'match-insights' });
+
+    const attach = () => {
+      document.getElementById('calc')?.addEventListener('click', () => emit('match_insights_calc_click'));
+      document.getElementById('copy')?.addEventListener('click', () => emit('match_insights_copy_summary'));
+      document.getElementById('csv')?.addEventListener('click', () => emit('match_insights_export_top5'));
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', attach, { once: true });
+    } else {
+      attach();
+    }
+  })();
+</script>
+<script type="module">
+  const btn = document.getElementById('btn-calculate');
+  btn?.addEventListener('click', () => {
+    // 这里放你的计算逻辑；先来个最小演示
+    try {
+      // 例：从表单读入两数相加
+      const a = Number((document.querySelector('[name="a"]') as HTMLInputElement)?.value || '0');
+      const b = Number((document.querySelector('[name="b"]') as HTMLInputElement)?.value || '0');
+      const out = document.getElementById('result') || (() => {
+        const d=document.createElement('div');d.id='result'; btn.after(d); return d;
+      })();
+      (out as HTMLElement).textContent = `Result: ${ (a + b).toFixed(2) }`;
+    } catch (e) { alert('计算失败：' + e); }
+  });
+</script>

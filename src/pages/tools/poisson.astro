@@ -318,6 +318,9 @@ const meta = {
   </BaseLayout>
 
 <button type="button" id="btn-share">Share link</button>
+<button type="button" class="btn" id="btn-history">历史数据</button>
+
+<button type="button" class="btn" id="btn-history">历史数据</button>
 <script type="module">
   import { makeShareUrl, readParams, normalizeDecimal } from '../../lib/share.ts';
 
@@ -350,3 +353,29 @@ const meta = {
     catch { window.prompt('Copy your share URL:', url); }
   });
 </script>
+
+<!-- lyra:tooling --><script src="/tooling.js" defer></script>
+<script is:inline>
+  (function () {
+    const emit = (event, detail = {}) => {
+      window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'poisson', ...detail } }));
+    };
+
+    emit('tool_view', { tool: 'poisson' });
+
+    const attach = () => {
+      const byId = (id) => document.getElementById(id);
+      byId('calcBtn')?.addEventListener('click', () => emit('poisson_calc_click'));
+      byId('csvBtn')?.addEventListener('click', () => emit('poisson_export_csv'));
+      byId('shareBtn')?.addEventListener('click', () => emit('poisson_share_click'));
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', attach, { once: true });
+    } else {
+      attach();
+    }
+  })();
+</script>
+
+{await import("../../components/HistoryPicker.astro").then(m => <m.default />)}

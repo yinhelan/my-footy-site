@@ -1,6 +1,6 @@
 ---
 import SEO from '../components/SEO.astro';
-import Analytics from '../components/Analytics.astro';
+import analyticsAdapter from '../components/AnalyticsAdapter.ts';
 
 export interface Props {
   title: string;
@@ -14,13 +14,14 @@ const {
   jsonLd = null,
   active = ''
 } = Astro.props;
+
+const analyticsScript = analyticsAdapter();
 ---
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <SEO title={title} description={description} jsonLd={jsonLd} />
-    <Analytics ga4Id={import.meta.env.PUBLIC_GA4_ID} defaultConsent="denied" />
-    <style>
+<style>
       :root{ --container: 880px; }
       *{ box-sizing: border-box }
       body{
@@ -62,5 +63,6 @@ const {
         <small class="muted">© Footy Analytics · 本工具仅用于学习演示，不构成投注建议。</small>
       </div>
     </footer>
+    {analyticsScript && <script is:inline>{analyticsScript}</script>}
   </body>
 </html>
