@@ -25,3 +25,6 @@ pnpm-debug.log*
 .vercel
 !/.env.production
 _bak/
+
+.pw-browsers/
+.pw-data/

@@ -11,7 +11,8 @@
     "dev:bg": "nohup pnpm run dev -- --port 4321 --host >/tmp/astro-4321.log 2>&1 & echo $! > /tmp/astro.pid && echo PID: $(cat /tmp/astro.pid)",
     "dev:stop": "kill $(cat /tmp/astro.pid) 2>/dev/null || true",
     "logs": "tail -f /tmp/astro-4321.log",
-    "e2e:b1b2": "node scripts/e2e/b1b2-smoke.mjs"
+    "e2e:b1b2": "node scripts/e2e/b1b2-smoke.mjs",
+    "e2e:b1b2:syschrome": "CHROME_PATH=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" node scripts/e2e/b1b2-smoke.mjs"
   },
   "dependencies": {
     "astro": "^5.13.5",
@@ -29,7 +30,8 @@
     "jsdom": "^24.1.3",
     "lighthouse": "^12.8.2",
     "linkinator": "^5.0.2",
-    "playwright": "~1.47.2"
+    "playwright": "~1.47.2",
+    "playwright-core": "~1.47.2"
   },
   "engines": {
     "node": ">=20 <23"
