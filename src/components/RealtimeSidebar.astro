@@ -16,30 +16,4 @@
   <a class="btn brand" style="margin-left:10px" href="/articles/">查看详情</a>
 </div>
 
-<script type="module">
-  const odds = document.querySelector('#odds');
-  const events = document.querySelector('#events');
-  const dock = document.querySelector('#mobile-dock');
-
-  async function load(){
-    const res = await fetch('/api/realtime.json');
-    const data = await res.json();
-    odds!.innerHTML = data.odds.map(o => `
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #eee">
-        <span>${o.match}</span>
-        <span>主胜 <b style="color:${o.delta>0?'var(--down)':'var(--up)'}">${o.price.toFixed(2)} ${o.delta>0?'↑':'↓'}</b></span>
-      </div>
-    `).join('');
-    events!.innerHTML = data.events.map(e => `
-      <div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed #eee">
-        <span class="tag">${e.minute}'</span>
-        <span>${e.text}</span>
-      </div>
-    `).join('');
-    // 移动端提示
-    if (window.matchMedia('(max-width: 959px)').matches) dock!.hidden = false;
-  }
-  load().catch(()=>{});
-  // 轻轮询
-  setInterval(load, 30000);
-</script>
+<script type="module" src="/src/client/inline/realtime-sidebar-client.ts"></script>

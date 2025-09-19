@@ -4,30 +4,5 @@
   <div class="container row" id="ticker-row">
     <span class="badge">Live</span>
   </div>
-  <script type="module">
-    async function render(){
-      const el = document.getElementById('ticker-row');
-      if(!el) return;
-      // 清旧项
-      el.querySelectorAll('.item').forEach(n=>n.remove());
-      try {
-        const res = await fetch('/api/ticker.json', { cache: 'no-store' });
-        const data = await res.json();
-        for (const it of (data.items || []).slice(0,5)) {
-          const node = document.createElement('span');
-          node.className = 'item';
-          node.innerHTML = `
-            <strong>${it.match}</strong>
-            <span>H ${it.odds[0]}</span>
-            <span>D ${it.odds[1]}</span>
-            <span>A ${it.odds[2]}</span>
-            <a class="btn brand" href="${it.href}">去分析</a>
-          `;
-          el.appendChild(node);
-        }
-      } catch (e) { /* 静默 */ }
-    }
-    render();
-    setInterval(render, 30000);
-  </script>
+  <script type="module" src="/src/client/inline/top-ticker-client.ts"></script>
 </section>

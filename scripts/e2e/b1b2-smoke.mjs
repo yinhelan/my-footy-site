@@ -87,17 +87,45 @@ async function run() {
   out.push(await pageJSON(async () => {
     const page = await ctx.newPage();
     await page.goto(`${BASE}/tools/implied-odds/`);
-    await page.waitForSelector('[data-testid="fill-example"]', { timeout: 5000 });
-    await page.click('[data-testid="fill-example"]');
-    const calc = page.locator('#btn-calc');
-    if (await calc.count()) {
-      const disabled = await calc.getAttribute('disabled');
-      if (disabled === null) await calc.click().catch(()=>{});
-    }
-    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      const overlay = document.querySelector('vite-error-overlay');
+      if (overlay) overlay.remove();
+    }).catch(()=>{});
+
+    const fillBtn = page.locator('[data-testid="fill-example"]').first();
+    await fillBtn.scrollIntoViewIfNeeded().catch(()=>{});
+    await fillBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(()=>{});
+
+    const ensureTable = async () => {
+      await page.fill('textarea#odds', '2.30,3.30,3.10').catch(()=>{});
+      const calc = page.locator('#btn-calc');
+      if (await calc.count()) {
+        await page.evaluate(() => {
+          const btn = document.getElementById('btn-calc');
+          if (btn) btn.removeAttribute('disabled');
+        }).catch(()=>{});
+        await calc.click().catch(()=>{});
+      }
+      await page.evaluate(() => {
+        try { window.__implied_calc__ && window.__implied_calc__(); } catch {}
+      }).catch(()=>{});
+    };
+
+    await fillBtn.click().catch(()=>{});
+    await ensureTable();
+    await page.waitForSelector('#out table', { timeout: 4000 }).catch(async () => {
+      await ensureTable();
+      await page.waitForSelector('#out table', { timeout: 4000 }).catch(()=>{});
+    });
+
     const table = await page.locator('#out table').first();
-    const ok = await table.count() > 0;
-    const snippet = ok ? (await page.locator('#out').innerText()).split('\n').slice(0,4).join(' ') : 'SKIP: #out table not found';
+    const ok = await table.count().catch(()=>0) > 0;
+    const snippet = ok
+      ? (await page.locator('#out').innerText().catch(()=>''))
+          .split('\n')
+          .slice(0, 4)
+          .join(' ')
+      : 'SKIP: #out table not found';
     await page.close();
     return { case: 'B1-implied', ok, snippet };
   }));

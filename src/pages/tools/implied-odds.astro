@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import HistoryPicker from '../../components/HistoryPicker.astro';
+import ResultsExport from '../../components/ResultsExport.astro';
 
 const meta = {
   title: 'Implied → Fair Odds',
@@ -19,330 +19,119 @@ const meta = {
       .field-error{display:block;color:#d32f2f;font-size:.75rem;margin-top:4px;}
       .btn[disabled]{opacity:.6;cursor:not-allowed;}
     </style>
+    <label style="display:flex;flex-direction:column;gap:4px">
+      赔率列表（逗号或空格分隔）
+      <textarea id="odds" rows="2" placeholder="2.30,3.30,3.10"></textarea>
+      <small class="field-error" data-error-for="odds"></small>
+    </label>
+
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <label style="display:flex;flex-direction:column;gap:4px">Market
-        <select name="kind" id="method">
-          <option value="3way">1X2 (3-way)</option>
-          <option value="2way">Two-way</option>
+      <label style="display:flex;flex-direction:column;gap:4px">格式
+        <select id="format">
+          <option value="decimal" selected>十进制</option>
+          <option value="american">美式</option>
+          <option value="fractional">分数</option>
         </select>
-        <small class="field-error" data-error-for="kind"></small>
       </label>
-      <label style="display:flex;flex-direction:column;gap:4px">Target Overround
-        <input name="target" type="number" step="0.01" placeholder="1.00" title="默认 1.00（100%），也可设定 1.03 表示 3% 抽水目标">
-        <small class="field-error" data-error-for="target"></small>
-      </label>
-    </div>
-
-    <div id="row-3way" style="display:flex;gap:10px;flex-wrap:wrap">
-      <label style="display:flex;flex-direction:column;gap:4px">Home (H)
-        <input name="H" type="number" step="0.01" placeholder="1.95">
-        <small class="field-error" data-error-for="H"></small>
-      </label>
-      <label style="display:flex;flex-direction:column;gap:4px">Draw (D)
-        <input name="D" type="number" step="0.01" placeholder="3.70">
-        <small class="field-error" data-error-for="D"></small>
-      </label>
-      <label style="display:flex;flex-direction:column;gap:4px">Away (A)
-        <input name="A" type="number" step="0.01" placeholder="3.80">
-        <small class="field-error" data-error-for="A"></small>
-      </label>
-    </div>
-
-    <div id="row-2way" style="display:none;gap:10px;flex-wrap:wrap">
-      <label style="display:flex;flex-direction:column;gap:4px">Side A
-        <input name="A2" type="number" step="0.01" placeholder="1.90">
-        <small class="field-error" data-error-for="A2"></small>
-      </label>
-      <label style="display:flex;flex-direction:column;gap:4px">Side B
-        <input name="B2" type="number" step="0.01" placeholder="1.90">
-        <small class="field-error" data-error-for="B2"></small>
+      <label style="display:flex;flex-direction:column;gap:4px">去水方法
+        <select id="method">
+          <option value="power" selected>Power</option>
+          <option value="multiplicative">Multiplicative</option>
+          <option value="basic">Basic</option>
+          <option value="shin">Shin</option>
+        </select>
       </label>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button type="button" id="btn-calc" class="btn">Calculate</button>
-      <button type="button" id="btn-share"   class="btn">Share link</button>
-      <button type="button" id="btn-history" class="btn">历史数据</button>
-      <button type="reset"  class="btn">Reset</button>
+      <button type="reset" class="btn">Reset</button>
     </div>
-    <input type="hidden" id="odds" name="odds" value="" />
-    <input type="hidden" id="format" name="format" value="decimal" />
   </form>
 
   <div id="out" class="card" style="margin-top:12px"></div>
 
-  <script type="module">
-    import { normalizeDecimal } from '/src/lib/share.ts';
-    import { encodeState, decodeState, syncToUrl } from '/src/lib/shareableState.ts';
-    import { required, isNumber, inRange, compose } from '/src/lib/validate.ts';
+  <ResultsExport />
 
-    const form = document.querySelector('#tool-form');
-    const out  = document.querySelector('#out');
-    const row3 = document.querySelector('#row-3way');
-    const row2 = document.querySelector('#row-2way');
-    const shareBtn = document.getElementById('btn-share');
+  <script type="module">
+    import { devig } from '/src/lib/odds/devig.ts';
+    import { toDecimal } from '/src/lib/odds/format.ts';
+
+    const oddsInput = document.querySelector('textarea#odds');
+    const formatSelect = document.getElementById('format');
+    const methodSelect = document.getElementById('method');
     const calcBtn = document.getElementById('btn-calc');
     const fillBtn = document.getElementById('btn-fill-example');
-    const oddsField = document.getElementById('odds');
-    const methodSelect = document.getElementById('method');
-    const formatField = document.getElementById('format');
+    const exportBtn = document.getElementById('btn-export-csv');
+    const out = document.getElementById('out');
 
-    const defaults = { odds: '2.30,3.30,3.10', method: '3way', format: 'decimal', target: '1.00' };
+    let lastRows = [];
 
-    const emit = (event, detail = {}) => {
-      window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'implied-odds', ...detail } }));
-    };
+    function renderTable(decimals, raw, fair, method, overround) {
+      const header = ['#', 'Decimal Odds', 'Raw Prob', 'Fair Prob', 'Method'];
+      const body = decimals
+        .map((odds, index) =>
+          `<tr><td>${index + 1}</td><td>${odds.toFixed(6)}</td><td>${raw[index].toFixed(6)}</td><td>${fair[index].toFixed(6)}</td><td>${method}</td></tr>`
+        )
+        .join('');
+      return `<div style="overflow:auto"><table style="border-collapse:collapse;min-width:520px">`
+        + `<thead><tr>${header.map((h) => `<th style="text-align:left;padding:6px 8px;color:#64748B;font-weight:600">${h}</th>`).join('')}</tr></thead>`
+        + `<tbody>${body}</tbody>`
+        + `<tfoot><tr><td colspan="5">overround: ${overround.toFixed(6)}</td></tr></tfoot>`
+        + `</table></div>`;
+    }
 
-    const validators = {
-      target: compose(required('请输入目标 Overround'), isNumber(), inRange(0.8, 2, '范围 0.8~2')),
-      H: compose(required('请输入主胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')),
-      D: compose(required('请输入平赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')),
-      A: compose(required('请输入客胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')),
-      A2: compose(required('请输入 A 赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')),
-      B2: compose(required('请输入 B 赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')),
-    };
-    const touched = new Set();
-
-    const q = (sel) => form?.querySelector(sel);
-    const errorEl = (name) => form?.querySelector(`[data-error-for="${name}"]`);
-    const getValue = (name) => (q(`[name="${name}"]`)?.value ?? '').trim();
-    const activeFields = () => ((methodSelect?.value ?? defaults.method) === '3way' ? ['target', 'H', 'D', 'A'] : ['target', 'A2', 'B2']);
-
-    const setError = (name, result, force) => {
-      const el = errorEl(name);
-      if (el) el.textContent = !result.ok && (force || touched.has(name)) ? (result.msg ?? '') : '';
-    };
-
-    const stateForUrl = () => {
-      const kind = methodSelect?.value ?? defaults.method;
-      let odds = '';
-      if (kind === '3way') {
-        odds = ['H', 'D', 'A'].map((k) => getValue(k)).filter(Boolean).join(',');
-      } else {
-        odds = ['A2', 'B2'].map((k) => getValue(k)).filter(Boolean).join(',');
-      }
-      if (oddsField instanceof HTMLInputElement) oddsField.value = odds;
-      if (formatField instanceof HTMLInputElement && !formatField.value) formatField.value = defaults.format;
-      const target = getValue('target');
-      return {
-        odds: odds || undefined,
-        method: kind,
-        format: formatField instanceof HTMLInputElement ? formatField.value : defaults.format,
-        target: target || undefined,
-      };
-    };
-
-    let syncTimer = 0;
-    const scheduleSync = () => {
-      if (typeof location === 'undefined') return;
-      clearTimeout(syncTimer);
-      syncTimer = window.setTimeout(() => {
-        syncToUrl(stateForUrl());
-      }, 120);
-    };
-
-    const validate = (force = false) => {
-      const active = activeFields();
-      if (force) active.forEach((name) => touched.add(name));
-      const allOk = active.every((name) => {
-        const validator = validators[name];
-        const result = validator ? validator(getValue(name)) : { ok: true };
-        setError(name, result, force);
-        return result.ok;
-      });
-      ['H', 'D', 'A', 'A2', 'B2'].filter((name) => !active.includes(name)).forEach((name) => setError(name, { ok: true }, true));
-      if (calcBtn instanceof HTMLButtonElement) calcBtn.disabled = !allOk;
-      if (shareBtn instanceof HTMLButtonElement) shareBtn.disabled = !allOk;
-      return allOk;
-    };
-
-    const num = (el) => {
-      const normalized = normalizeDecimal(el && el.value || '');
-      const n = Number(normalized);
-      return Number.isFinite(n) ? n : NaN;
-    };
-    const formatPct = (x) => (x*100).toFixed(1) + '%';
-    const td = (s) => '<td style="padding:6px 8px;border-bottom:1px solid #eee;white-space:nowrap">'+s+'</td>';
-
-    const renderTable = (rows, caption) => `
-      <div style="overflow:auto">
-        <table style="border-collapse:collapse;min-width:520px">
-          ${caption ? `<caption style="text-align:left;margin:.3rem 0 .5rem 0;color:#64748B">${caption}</caption>` : ''}
-          <thead><tr>
-            ${['项','H/A','D/B','A'].map(h=>'<th style="text-align:left;padding:6px 8px;color:#64748B;font-weight:600">'+h+'</th>').join('')}
-          </tr></thead>
-          <tbody>
-            ${rows.map(r=>`<tr>${r.map(td).join('')}</tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-
-    const syncMode = () => {
-      const kind = methodSelect?.value ?? defaults.method;
-      if (row3 && row2) {
-        row3.style.display = (kind === '3way') ? 'flex' : 'none';
-        row2.style.display = (kind === '2way') ? 'flex' : 'none';
-      }
-    };
-
-    const calc = () => {
-      if (!validate(false)) {
-        if (out) out.textContent = '请检查输入';
+    function calc() {
+      if (!(oddsInput instanceof HTMLTextAreaElement) || !out) return;
+      const format = (formatSelect instanceof HTMLSelectElement ? formatSelect.value : 'decimal');
+      const method = (methodSelect instanceof HTMLSelectElement ? methodSelect.value : 'power');
+      const decimals = toDecimal(format, oddsInput.value);
+      if (!decimals.length) {
+        out.textContent = '请输入有效赔率（至少 2 项）';
+        lastRows = [];
         return;
       }
-
-      syncMode();
-      const kind = methodSelect?.value ?? defaults.method;
-      const target = Number(normalizeDecimal(getValue('target') || '1.00'));
-
-      if (kind === '3way') {
-        const H = num(q('[name="H"]'));
-        const D = num(q('[name="D"]'));
-        const A = num(q('[name="A"]'));
-        const pH = 1/H, pD = 1/D, pA = 1/A;
-        const over = pH + pD + pA;
-        const f = target / over;
-        const nh = pH * f, nd = pD * f, na = pA * f;
-        const fairH = 1/nh, fairD = 1/nd, fairA = 1/na;
-        if (out) {
-          out.innerHTML =
-            renderTable([
-              ['隐含概率', formatPct(pH), formatPct(pD), formatPct(pA)],
-              ['目标归一后概率', formatPct(nh), formatPct(nd), formatPct(na)],
-              ['公平/目标赔率', fairH.toFixed(2), fairD.toFixed(2), fairA.toFixed(2)],
-            ], `当前总和：${over.toFixed(3)}；目标总和：${target.toFixed(3)}`);
-        }
-      } else {
-        const A2 = num(q('[name="A2"]'));
-        const B2 = num(q('[name="B2"]'));
-        const pA = 1/A2, pB = 1/B2, over = pA+pB, f = target/over;
-        const na = pA*f, nb = pB*f, fairA = 1/na, fairB = 1/nb;
-        if (out) {
-          out.innerHTML =
-            renderTable([
-              ['隐含概率', formatPct(pA), formatPct(pB), ''],
-              ['目标归一后概率', formatPct(na), formatPct(nb), ''],
-              ['公平/目标赔率', fairA.toFixed(2), fairB.toFixed(2), ''],
-            ], `当前总和：${over.toFixed(3)}；目标总和：${target.toFixed(3)}`);
-        }
+      try {
+        const { overround, raw, fair } = devig(method, decimals);
+        out.innerHTML = renderTable(decimals, raw, fair, method, overround);
+        lastRows = decimals.map((odds, index) => ({
+          market: 'list',
+          outcome: `#${index + 1}`,
+          odds_decimal: odds.toFixed(6),
+          raw_prob: raw[index].toFixed(6),
+          method,
+          fair_prob: fair[index].toFixed(6),
+          overround: overround.toFixed(6)
+        }));
+      } catch (error) {
+        out.textContent = (error instanceof Error) ? error.message : '计算失败';
+        lastRows = [];
       }
-      scheduleSync();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.__implied_calc__ = calc;
     }
 
-    if (form) {
-      form.querySelectorAll('input[type="number"], input[type="text"]').forEach((el) => {
-        el.addEventListener('input', () => {
-          touched.add(el.name);
-          stateForUrl();
-          if (validate(false)) calc();
-          scheduleSync();
-        });
-        el.addEventListener('blur', () => {
-          touched.add(el.name);
-          validate(false);
-          scheduleSync();
-        });
-      });
-      methodSelect?.addEventListener('change', () => {
-        syncMode();
-        validate(true);
-        stateForUrl();
-        if (!(calcBtn instanceof HTMLButtonElement) || !calcBtn.disabled) calc();
-        scheduleSync();
-      });
-      form.addEventListener('reset', () => {
-        setTimeout(() => {
-          touched.clear();
-          validate(false);
-          if (out) out.textContent = '';
-          if (oddsField instanceof HTMLInputElement) oddsField.value = '';
-          scheduleSync();
-        }, 0);
-      });
-    }
+    window.__implied_calc__ = calc;
 
-    if (calcBtn instanceof HTMLButtonElement) {
-      calcBtn.disabled = true;
-      calcBtn.addEventListener('click', () => {
-        if (!validate(true)) return;
-        emit('calc_submit');
-        calc();
-      });
-    }
+    calcBtn?.addEventListener('click', calc);
 
-    if (fillBtn) {
-      fillBtn.addEventListener('click', () => {
-        const setValue = (name, value) => {
-          const el = q(`[name="${name}"]`);
-          if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
-            el.value = value;
-            touched.add(name);
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        };
-        setValue('kind', '3way');
-        setValue('target', '1.00');
-        setValue('H', '2.30');
-        setValue('D', '3.30');
-        setValue('A', '3.10');
-        if (formatField instanceof HTMLInputElement) formatField.value = defaults.format;
-        emit('example_fill_click');
-        syncMode();
-        stateForUrl();
-        const ok = validate(true);
-        if (calcBtn instanceof HTMLButtonElement) {
-          calcBtn.disabled = !ok;
-          if (ok) {
-            calcBtn.click();
-          } else {
-            calc();
-          }
-        } else {
-          calc();
-        }
-      });
-    }
-
-    shareBtn?.addEventListener('click', async () => {
-      if (!validate(true)) return;
-      const state = stateForUrl();
-      const qs = encodeState(state);
-      const url = typeof location !== 'undefined' ? `${location.origin}${location.pathname}${qs}` : qs;
-      try { await navigator.clipboard.writeText(url); alert('Share link copied!'); }
-      catch { window.prompt('Copy your share URL:', url); }
+    fillBtn?.addEventListener('click', () => {
+      if (oddsInput instanceof HTMLTextAreaElement) oddsInput.value = '2.30,3.30,3.10';
+      calc();
     });
 
-    if (typeof location !== 'undefined') {
-      const state = decodeState(location.search, defaults);
-      if (methodSelect instanceof HTMLSelectElement) methodSelect.value = state.method || defaults.method;
-      const oddsParts = String(state.odds || '').split(',').map((s) => s.trim()).filter(Boolean);
-      if (state.method === '2way') {
-        ['A2', 'B2'].forEach((name, idx) => {
-          const el = q(`[name="${name}"]`);
-          if (el && oddsParts[idx]) el.value = oddsParts[idx];
-        });
-      } else {
-        ['H', 'D', 'A'].forEach((name, idx) => {
-          const el = q(`[name="${name}"]`);
-          if (el && oddsParts[idx]) el.value = oddsParts[idx];
-        });
-      }
-      const targetEl = q('[name="target"]');
-      if (targetEl && state.target) targetEl.value = String(state.target);
-      if (formatField instanceof HTMLInputElement) formatField.value = state.format || defaults.format;
-      stateForUrl();
-    }
+    exportBtn?.addEventListener('click', () => {
+      if (!lastRows.length) return;
+      const headers = ['market', 'outcome', 'odds_decimal', 'raw_prob', 'method', 'fair_prob', 'overround'];
+      const csv = [headers.join(','), ...lastRows.map(row => headers.map((h) => row[h]).join(','))].join('
+');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'implied-odds.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
 
-    syncMode();
-    validate(false);
-    scheduleSync();
-    emit('tool_view');
-    if (!(calcBtn instanceof HTMLButtonElement) || !calcBtn.disabled) calc();
+    calc();
   </script>
 
-  <HistoryPicker />
 </BaseLayout>

@@ -23,17 +23,22 @@
   const modal = document.getElementById('history-modal');
   const go = document.getElementById('hp-go');
   document.addEventListener('click', (e)=>{
-    const t = e.target;
-    if (t && (t as HTMLElement).id === 'btn-history') {
-      (modal as HTMLDialogElement).showModal();
+    const target = e.target;
+    if (target instanceof HTMLElement && target.id === 'btn-history') {
+      if (modal instanceof HTMLDialogElement) modal.showModal();
     }
   });
-  go?.addEventListener('click', (e)=>{
-    e.preventDefault();
-    const league = (document.getElementById('hp-league') as HTMLSelectElement).value;
-    const home = (document.getElementById('hp-home') as HTMLInputElement).value;
-    const away = (document.getElementById('hp-away') as HTMLInputElement).value;
-    const date = (document.getElementById('hp-date') as HTMLInputElement).value;
+  if (go instanceof HTMLButtonElement) {
+    go.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const leagueEl = document.getElementById('hp-league');
+      const homeEl = document.getElementById('hp-home');
+      const awayEl = document.getElementById('hp-away');
+      const dateEl = document.getElementById('hp-date');
+      const league = leagueEl instanceof HTMLSelectElement ? leagueEl.value : '';
+      const home = homeEl instanceof HTMLInputElement ? homeEl.value : '';
+      const away = awayEl instanceof HTMLInputElement ? awayEl.value : '';
+      const date = dateEl instanceof HTMLInputElement ? dateEl.value : '';
     // 跳到 Poisson（示例），也可换成当前工具类型
     const url = new URL('/tools/poisson/', window.location.origin);
     if (home) url.searchParams.set('home', home);
@@ -41,5 +46,6 @@
     if (league) url.searchParams.set('league', league);
     if (date) url.searchParams.set('date', date);
     window.location.href = url.toString();
-  });
+    });
+  }
 </script>

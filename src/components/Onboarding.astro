@@ -7,9 +7,4 @@
   </ol>
   <button class="btn" id="ob-close">知道了</button>
 </div>
-<script type="module">
-  const KEY='ob-v1';
-  const box=document.getElementById('ob'); const btn=document.getElementById('ob-close');
-  if(!localStorage.getItem(KEY)){ box!.style.display='block'; }
-  btn?.addEventListener('click',()=>{ localStorage.setItem(KEY,'1'); box!.remove(); });
-</script>
+<script type="module" src="/src/client/inline/onboarding-client.ts"></script>
