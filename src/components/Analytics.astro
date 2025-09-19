@@ -1,33 +1,5 @@
 ---
+/** 空组件：占位用，避免构建期报错；不加载任何脚本 */
 interface Props { ga4Id?: string; defaultConsent?: 'granted' | 'denied'; }
-const GAID = Astro.props.ga4Id ?? import.meta.env.PUBLIC_GA4_ID;
-const DEFAULT = Astro.props.defaultConsent ?? 'denied';
 ---
-{GAID && (
-  <script type="module">
-    const GAID = /* @__PURE__ */ JSON.parse(JSON.stringify({GAID: String({GAID})})).GAID || {GAID};
-    const KEY = 'consent.analytics';
-    const DNT = navigator.doNotTrack === '1' || window.doNotTrack === '1';
-    const saved = (()=>{ try { return localStorage.getItem(KEY); } catch { return null; } })();
-    const defaultConsent = /* @__PURE__ */ JSON.parse(JSON.stringify({DEFAULT: String({DEFAULT})})).DEFAULT || {DEFAULT};
-    const consent = DNT ? 'denied' : (saved || defaultConsent);
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){ window.dataLayer.push(arguments); }
-    window.gtag = gtag;
-    gtag('consent','default',{ ad_storage: consent, analytics_storage: consent });
-    gtag('js', new Date());
-    function loadGA(){
-      if (document.querySelector('script[src*="gtag/js?id="]')) return;
-      const s = document.createElement('script');
-      s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GAID;
-      document.head.appendChild(s);
-      gtag('config', GAID, { anonymize_ip: true });
-    }
-    if (consent !== 'denied') loadGA();
-    window.__setAnalyticsConsent = function(v){
-      try { localStorage.setItem(KEY, v); } catch {}
-      gtag('consent','update',{ ad_storage: v, analytics_storage: v });
-      if (v !== 'denied') loadGA();
-    };
-  </script>
-)}
+<!-- analytics disabled -->

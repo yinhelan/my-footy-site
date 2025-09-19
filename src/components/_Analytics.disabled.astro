@@ -1,0 +1,22 @@
+---
+type Consent = 'granted' | 'denied';
+
+interface Props {
+  ga4Id?: string;
+  defaultConsent?: Consent;
+}
+
+const gaid = (Astro.props.ga4Id ?? import.meta.env.PUBLIC_GA4_ID) as string | undefined;
+const consent: Consent = (Astro.props.defaultConsent ?? 'denied') as Consent;
+
+// 构建期拿到静态资源绝对路径（/_astro/*.js）
+import analyticsURL from '../scripts/analytics-init.ts?url';
+
+// 用 URLSearchParams 拼 query，避免模板字符串
+const params = new URLSearchParams({
+  gaid: String(gaid ?? ''),
+  default: consent,
+});
+const src = analyticsURL + '?' + params.toString();
+---
+{gaid && <script type="module" src={src}></script>}

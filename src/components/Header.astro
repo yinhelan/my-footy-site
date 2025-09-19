@@ -1,0 +1,51 @@
+---
+const items = {
+  basic: [
+    { href: '/tools/poisson/', label: 'Poisson 模型' },
+    { href: '/tools/implied-odds/', label: '公平赔率' },
+  ],
+  advanced: [
+    { href: '/tools/xg/', label: 'xG 预期进球' },
+    { href: '/tools/kelly/', label: '凯利指数' },
+  ],
+  extended: [
+    { href: '/tools/market/', label: '盘口分析（亚盘/欧赔）' },
+    { href: '/tools/history-compare/', label: '历史数据对比' },
+  ],
+};
+---
+<header class="site-header">
+  <div class="container site-nav">
+    <a href="/" aria-label="Home" style="font-weight:700;">Footy Analytics</a>
+    <nav style="display:flex;gap:14px;">
+      <a href="/articles/">Articles</a>
+      <div class="dropdown">
+        <button type="button">Tools ▾</button>
+        <div class="dropdown-panel">
+          <div style="display:grid;gap:10px">
+            <div>
+              <h4>基础</h4>
+              <ul>
+                {items.basic.map(i => <li><a href={i.href}>{i.label}</a></li>)}
+              </ul>
+            </div>
+            <div>
+              <h4>进阶</h4>
+              <ul>
+                {items.advanced.map(i => <li><a href={i.href}>{i.label}</a></li>)}
+              </ul>
+            </div>
+            <div>
+              <h4>扩展</h4>
+              <ul>
+                {items.extended.map(i => <li><a href={i.href}>{i.label}</a></li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <span class="spacer"></span>
+    <a class="btn" href="/rss.xml">RSS</a>
+  </div>
+</header>

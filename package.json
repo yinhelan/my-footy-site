@@ -12,6 +12,7 @@
     "dev:stop": "kill $(cat /tmp/astro.pid) 2>/dev/null || true",
     "logs": "tail -f /tmp/astro-4321.log",
     "e2e:b1b2": "node scripts/e2e/b1b2-smoke.mjs",
+    "e2e:b1b2:cdp": "node scripts/e2e/b1b2-smoke.mjs",
     "e2e:b1b2:syschrome": "CHROME_PATH=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" node scripts/e2e/b1b2-smoke.mjs"
   },
   "dependencies": {

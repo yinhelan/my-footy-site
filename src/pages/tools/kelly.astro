@@ -21,15 +21,15 @@ const meta = {
     </style>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <label style="display:flex;flex-direction:column;gap:4px">赔率 (decimal)
-        <input name="odds" type="number" step="0.01" placeholder="1.95">
+        <input id="decimalOdds" name="odds" type="number" step="0.01" placeholder="1.95">
         <small class="field-error" data-error-for="odds"></small>
       </label>
       <label style="display:flex;flex-direction:column;gap:4px">自估胜率 p (0~1 或 %)
-        <input name="p" type="number" step="0.01" placeholder="0.54">
+        <input id="fairProb" name="p" type="number" step="0.01" placeholder="0.54">
         <small class="field-error" data-error-for="p"></small>
       </label>
       <label style="display:flex;flex-direction:column;gap:4px">Bankroll（可选）
-        <input name="bankroll" type="number" step="1" placeholder="1000">
+        <input id="bankroll" name="bankroll" type="number" step="1" placeholder="1000">
         <small class="field-error" data-error-for="bankroll"></small>
       </label>
     </div>
@@ -39,19 +39,32 @@ const meta = {
       <button type="button" id="btn-history" class="btn">历史数据</button>
       <button type="reset"  class="btn">Reset</button>
     </div>
+    <input type="hidden" id="fraction" name="fraction" value="1" />
   </form>
 
   <div id="out" class="card" style="margin-top:12px"></div>
 
   <script type="module">
-    import { makeShareUrl, readParams, normalizeDecimal } from '../../lib/share.ts';
-    import { required, isNumber, inRange, compose } from '../../lib/validate.ts';
+    import { normalizeDecimal } from '/src/lib/share.ts';
+    import { encodeState, decodeState, syncToUrl } from '/src/lib/shareableState.ts';
+    import { required, isNumber, inRange, compose } from '/src/lib/validate.ts';
 
     const form = document.getElementById('tool-form');
     const out  = document.getElementById('out');
     const shareBtn = document.getElementById('btn-share');
     const calcBtn = document.getElementById('btn-calc');
     const fillBtn = document.getElementById('btn-fill-example');
+    const oddsInput = document.getElementById('decimalOdds');
+    const probInput = document.getElementById('fairProb');
+    const bankrollInput = document.getElementById('bankroll');
+    const fractionInput = document.getElementById('fraction');
+
+    const defaults = {
+      decimalOdds: '2.30',
+      fairProb: '0.47',
+      bankroll: '1000',
+      fraction: '1',
+    };
 
     const emit = (event, detail = {}) => {
       window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'kelly', ...detail } }));
@@ -73,6 +86,28 @@ const meta = {
       if (el) el.textContent = !result.ok && (force || touched.has(name)) ? (result.msg ?? '') : '';
     };
 
+    const stateForUrl = () => {
+      const odds = getValue('odds');
+      const fairProb = getValue('p');
+      const bankroll = getValue('bankroll');
+      const fraction = fractionInput instanceof HTMLInputElement ? fractionInput.value : '';
+      return {
+        decimalOdds: odds || undefined,
+        fairProb: fairProb || undefined,
+        bankroll: bankroll || undefined,
+        fraction: fraction || undefined,
+      };
+    };
+
+    let syncTimer = 0;
+    const scheduleSync = () => {
+      if (typeof location === 'undefined') return;
+      clearTimeout(syncTimer);
+      syncTimer = window.setTimeout(() => {
+        syncToUrl(stateForUrl());
+      }, 120);
+    };
+
     const validate = (force = false) => {
       if (force) Object.keys(validators).forEach((name) => touched.add(name));
       const allOk = Object.entries(validators).every(([name, validator]) => {
@@ -90,26 +125,24 @@ const meta = {
       const n = Number(s);
       return Number.isFinite(n) ? n : NaN;
     };
-    const fmt = (x, d=2) => Number.isFinite(x) ? x.toFixed(d) : '—';
+    const fmt = (x, d = 2) => Number.isFinite(x) ? x.toFixed(d) : '—';
 
     const calc = () => {
       if (!validate(false)) {
         if (out) out.textContent = '请输入正确的赔率、胜率和 bankroll';
         return;
       }
-      const oddsInput = q('[name="odds"]');
-      const probInput = q('[name="p"]');
-      const bankrollInput = q('[name="bankroll"]');
       const o = num(oddsInput);
       let p = num(probInput);
       const br = num(bankrollInput);
 
       if (p > 1) p = p/100;
 
+      const fraction = fractionInput instanceof HTMLInputElement ? Number(fractionInput.value || defaults.fraction) : 1;
       const b = o - 1;
       const qProb = 1 - p;
       const k = (b*p - qProb) / b;
-      const kFull = Math.max(0, k);
+      const kFull = Math.max(0, k) * fraction;
       const kHalf = kFull / 2;
       const kQuarter = kFull / 4;
 
@@ -130,24 +163,32 @@ const meta = {
             ` : ''}
           </div>`;
       }
+      scheduleSync();
     };
+
+    if (typeof window !== 'undefined') {
+      window.__kelly_calc__ = calc;
+    }
 
     if (form) {
       form.querySelectorAll('input').forEach((el) => {
         el.addEventListener('input', () => {
           touched.add(el.name);
           if (validate(false)) calc();
+          scheduleSync();
         });
         el.addEventListener('blur', () => {
           touched.add(el.name);
           validate(false);
+          scheduleSync();
         });
       });
       form.addEventListener('reset', () => {
         setTimeout(() => {
           touched.clear();
           validate(false);
-          if (out) out.text内容 = '';
+          if (out) out.textContent = '';
+          scheduleSync();
         }, 0);
       });
     }
@@ -171,32 +212,45 @@ const meta = {
             el.dispatchEvent(new Event('input', { bubbles: true }));
           }
         };
-        setValue('odds', '2.30');
-        setValue('p', '0.47');
-        setValue('bankroll', '1000');
+        setValue('odds', defaults.decimalOdds);
+        setValue('p', defaults.fairProb);
+        setValue('bankroll', defaults.bankroll);
+        if (fractionInput instanceof HTMLInputElement) fractionInput.value = defaults.fraction;
         emit('example_fill_click');
-        validate(true);
-        if (calcBtn instanceof HTMLButtonElement && !calcBtn.disabled) calcBtn.click();
+        const ok = validate(true);
+        if (calcBtn instanceof HTMLButtonElement) {
+          calcBtn.disabled = !ok;
+          if (ok) {
+            calcBtn.click();
+          } else {
+            calc();
+          }
+        } else {
+          calc();
+        }
+        scheduleSync();
       });
     }
 
     shareBtn?.addEventListener('click', async () => {
       if (!validate(true)) return;
-      const data = Object.fromEntries(new FormData(form));
-      const url = makeShareUrl(window.location.pathname, data);
+      const state = stateForUrl();
+      const qs = encodeState(state);
+      const url = typeof location !== 'undefined' ? `${location.origin}${location.pathname}${qs}` : qs;
       try { await navigator.clipboard.writeText(url); alert('Share link copied!'); }
       catch { window.prompt('Copy your share URL:', url); }
     });
 
-    const state = readParams({ odds:'', p:'', bankroll:'' });
-    Object.entries(state).forEach(([k,v])=>{
-      const el = form.querySelector(`[name="${k}"]`);
-      if (el) {
-        el.value = String(v);
-        if (v) touched.add(k);
-      }
-    });
+    if (typeof location !== 'undefined') {
+      const state = decodeState(location.search, defaults);
+      if (oddsInput instanceof HTMLInputElement) oddsInput.value = String(state.decimalOdds ?? defaults.decimalOdds);
+      if (probInput instanceof HTMLInputElement) probInput.value = String(state.fairProb ?? defaults.fairProb);
+      if (bankrollInput instanceof HTMLInputElement) bankrollInput.value = String(state.bankroll ?? defaults.bankroll);
+      if (fractionInput instanceof HTMLInputElement) fractionInput.value = String(state.fraction ?? defaults.fraction);
+    }
+
     validate(false);
+    scheduleSync();
     emit('tool_view');
     if (!(calcBtn instanceof HTMLButtonElement) || !calcBtn.disabled) calc();
   </script>

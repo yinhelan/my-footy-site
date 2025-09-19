@@ -1,0 +1,66 @@
+:root{
+  --brand-bg:#0B2A4A;   /* 深蓝 */
+  --brand-fg:#FFFFFF;   /* 白字 */
+  --ink:#0F172A;        /* 主文本 */
+  --muted:#64748B;      /* 次文本 */
+  --ui:#F1F5F9;         /* UI 浅灰 */
+  --accent:#0E7490;     /* 次品牌蓝青 */
+  --up:#059669;         /* 绿色（降水位/赔率下降） */
+  --down:#DC2626;       /* 红色（升水/赔率上升） */
+}
+
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:1100px;margin:0 auto;padding:0 16px}
+
+/* 顶部条 */
+.site-header{background:var(--brand-bg);color:var(--brand-fg)}
+.site-header a{color:var(--brand-fg)}
+.site-nav{display:flex;gap:16px;align-items:center;padding:12px 0}
+.site-nav .spacer{flex:1}
+
+/* Tools 下拉 */
+.dropdown{position:relative}
+.dropdown > button{background:transparent;color:var(--brand-fg);border:0;font-weight:600;cursor:pointer}
+.dropdown-panel{
+  position:absolute;inset:auto auto auto 0;min-width:280px;display:none;
+  background:#fff;color:var(--ink);border:1px solid #e5e7eb;border-radius:10px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);z-index:50
+}
+.dropdown:hover .dropdown-panel{display:block}
+.dropdown h4{margin:.25rem 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.dropdown ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+
+/* 顶部实时看板 */
+.ticker{background:#0F172A;color:#fff}
+.ticker .row{display:flex;gap:12px;overflow:auto;white-space:nowrap;padding:6px 0}
+.ticker .item{display:inline-flex;gap:8px;align-items:center;padding:4px 10px;background:#111827;border-radius:999px}
+.badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#1F2937}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #e5e7eb;border-radius:10px;padding:8px 12px;background:#fff;color:var(--ink)}
+.btn:hover{background:var(--ui)}
+.btn.brand{background:var(--brand-bg);color:#fff;border-color:transparent}
+.btn.brand:hover{filter:brightness(1.08)}
+
+/* 右侧实时侧栏（桌面显/移动收起） */
+.layout{display:grid;grid-template-columns:1fr;gap:20px}
+@media(min-width:960px){
+  .layout{grid-template-columns:1fr 320px}
+  .aside{position:sticky;top:12px;height:calc(100dvh - 24px);overflow:auto;border-left:1px solid #e5e7eb;padding-left:16px}
+}
+.card{border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:12px}
+.card h3{margin:.3rem 0 .5rem 0}
+
+/* 移动端底部浮窗 */
+@media(max-width:959px){
+  .mobile-dock{
+    position:fixed;left:0;right:0;bottom:10px;margin:auto;max-width:640px;
+    background:#111827;color:#fff;border-radius:12px;padding:8px 10px;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.18)
+  }
+}
+
+/* 工具卡网格 */
+.grid{display:grid;gap:12px}
+@media(min-width:720px){ .grid.cols-2{grid-template-columns:repeat(2,1fr)} }
+.tag{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--ui);color:#0F172A}
+.spark{display:inline-block;vertical-align:middle}

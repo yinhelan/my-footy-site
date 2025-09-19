@@ -21,7 +21,7 @@ const meta = {
     </style>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <label style="display:flex;flex-direction:column;gap:4px">Market
-        <select name="kind">
+        <select name="kind" id="method">
           <option value="3way">1X2 (3-way)</option>
           <option value="2way">Two-way</option>
         </select>
@@ -65,13 +65,16 @@ const meta = {
       <button type="button" id="btn-history" class="btn">历史数据</button>
       <button type="reset"  class="btn">Reset</button>
     </div>
+    <input type="hidden" id="odds" name="odds" value="" />
+    <input type="hidden" id="format" name="format" value="decimal" />
   </form>
 
   <div id="out" class="card" style="margin-top:12px"></div>
 
   <script type="module">
-    import { makeShareUrl, readParams, normalizeDecimal } from '../../lib/share.ts';
-    import { required, isNumber, inRange, compose } from '../../lib/validate.ts';
+    import { normalizeDecimal } from '/src/lib/share.ts';
+    import { encodeState, decodeState, syncToUrl } from '/src/lib/shareableState.ts';
+    import { required, isNumber, inRange, compose } from '/src/lib/validate.ts';
 
     const form = document.querySelector('#tool-form');
     const out  = document.querySelector('#out');
@@ -80,6 +83,11 @@ const meta = {
     const shareBtn = document.getElementById('btn-share');
     const calcBtn = document.getElementById('btn-calc');
     const fillBtn = document.getElementById('btn-fill-example');
+    const oddsField = document.getElementById('odds');
+    const methodSelect = document.getElementById('method');
+    const formatField = document.getElementById('format');
+
+    const defaults = { odds: '2.30,3.30,3.10', method: '3way', format: 'decimal', target: '1.00' };
 
     const emit = (event, detail = {}) => {
       window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'implied-odds', ...detail } }));
@@ -98,11 +106,39 @@ const meta = {
     const q = (sel) => form?.querySelector(sel);
     const errorEl = (name) => form?.querySelector(`[data-error-for="${name}"]`);
     const getValue = (name) => (q(`[name="${name}"]`)?.value ?? '').trim();
-    const activeFields = () => (q('[name="kind"]').value === '3way' ? ['target', 'H', 'D', 'A'] : ['target', 'A2', 'B2']);
+    const activeFields = () => ((methodSelect?.value ?? defaults.method) === '3way' ? ['target', 'H', 'D', 'A'] : ['target', 'A2', 'B2']);
 
     const setError = (name, result, force) => {
       const el = errorEl(name);
       if (el) el.textContent = !result.ok && (force || touched.has(name)) ? (result.msg ?? '') : '';
+    };
+
+    const stateForUrl = () => {
+      const kind = methodSelect?.value ?? defaults.method;
+      let odds = '';
+      if (kind === '3way') {
+        odds = ['H', 'D', 'A'].map((k) => getValue(k)).filter(Boolean).join(',');
+      } else {
+        odds = ['A2', 'B2'].map((k) => getValue(k)).filter(Boolean).join(',');
+      }
+      if (oddsField instanceof HTMLInputElement) oddsField.value = odds;
+      if (formatField instanceof HTMLInputElement && !formatField.value) formatField.value = defaults.format;
+      const target = getValue('target');
+      return {
+        odds: odds || undefined,
+        method: kind,
+        format: formatField instanceof HTMLInputElement ? formatField.value : defaults.format,
+        target: target || undefined,
+      };
+    };
+
+    let syncTimer = 0;
+    const scheduleSync = () => {
+      if (typeof location === 'undefined') return;
+      clearTimeout(syncTimer);
+      syncTimer = window.setTimeout(() => {
+        syncToUrl(stateForUrl());
+      }, 120);
     };
 
     const validate = (force = false) => {
@@ -142,7 +178,7 @@ const meta = {
       </div>`;
 
     const syncMode = () => {
-      const kind = q('[name="kind"]').value;
+      const kind = methodSelect?.value ?? defaults.method;
       if (row3 && row2) {
         row3.style.display = (kind === '3way') ? 'flex' : 'none';
         row2.style.display = (kind === '2way') ? 'flex' : 'none';
@@ -156,7 +192,7 @@ const meta = {
       }
 
       syncMode();
-      const kind = q('[name="kind"]').value;
+      const kind = methodSelect?.value ?? defaults.method;
       const target = Number(normalizeDecimal(getValue('target') || '1.00'));
 
       if (kind === '3way') {
@@ -190,29 +226,41 @@ const meta = {
             ], `当前总和：${over.toFixed(3)}；目标总和：${target.toFixed(3)}`);
         }
       }
+      scheduleSync();
     };
+
+    if (typeof window !== 'undefined') {
+      window.__implied_calc__ = calc;
+    }
 
     if (form) {
       form.querySelectorAll('input[type="number"], input[type="text"]').forEach((el) => {
         el.addEventListener('input', () => {
           touched.add(el.name);
+          stateForUrl();
           if (validate(false)) calc();
+          scheduleSync();
         });
         el.addEventListener('blur', () => {
           touched.add(el.name);
           validate(false);
+          scheduleSync();
         });
       });
-      q('[name="kind"]').addEventListener('change', () => {
+      methodSelect?.addEventListener('change', () => {
         syncMode();
         validate(true);
+        stateForUrl();
         if (!(calcBtn instanceof HTMLButtonElement) || !calcBtn.disabled) calc();
+        scheduleSync();
       });
       form.addEventListener('reset', () => {
         setTimeout(() => {
           touched.clear();
           validate(false);
           if (out) out.textContent = '';
+          if (oddsField instanceof HTMLInputElement) oddsField.value = '';
+          scheduleSync();
         }, 0);
       });
     }
@@ -241,31 +289,57 @@ const meta = {
         setValue('H', '2.30');
         setValue('D', '3.30');
         setValue('A', '3.10');
+        if (formatField instanceof HTMLInputElement) formatField.value = defaults.format;
         emit('example_fill_click');
         syncMode();
-        validate(true);
-        if (calcBtn instanceof HTMLButtonElement && !calcBtn.disabled) calcBtn.click();
+        stateForUrl();
+        const ok = validate(true);
+        if (calcBtn instanceof HTMLButtonElement) {
+          calcBtn.disabled = !ok;
+          if (ok) {
+            calcBtn.click();
+          } else {
+            calc();
+          }
+        } else {
+          calc();
+        }
       });
     }
 
     shareBtn?.addEventListener('click', async () => {
       if (!validate(true)) return;
-      const data = Object.fromEntries(new FormData(form));
-      const url = makeShareUrl(window.location.pathname, data);
+      const state = stateForUrl();
+      const qs = encodeState(state);
+      const url = typeof location !== 'undefined' ? `${location.origin}${location.pathname}${qs}` : qs;
       try { await navigator.clipboard.writeText(url); alert('Share link copied!'); }
       catch { window.prompt('Copy your share URL:', url); }
     });
 
-    const state = readParams({ kind:'3way', H:'', D:'', A:'', A2:'', B2:'', target:'' });
-    Object.entries(state).forEach(([k,v])=>{
-      const el = q(`[name="${k}"]`);
-      if (el) {
-        el.value = String(v);
-        if (v) touched.add(k);
+    if (typeof location !== 'undefined') {
+      const state = decodeState(location.search, defaults);
+      if (methodSelect instanceof HTMLSelectElement) methodSelect.value = state.method || defaults.method;
+      const oddsParts = String(state.odds || '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (state.method === '2way') {
+        ['A2', 'B2'].forEach((name, idx) => {
+          const el = q(`[name="${name}"]`);
+          if (el && oddsParts[idx]) el.value = oddsParts[idx];
+        });
+      } else {
+        ['H', 'D', 'A'].forEach((name, idx) => {
+          const el = q(`[name="${name}"]`);
+          if (el && oddsParts[idx]) el.value = oddsParts[idx];
+        });
       }
-    });
+      const targetEl = q('[name="target"]');
+      if (targetEl && state.target) targetEl.value = String(state.target);
+      if (formatField instanceof HTMLInputElement) formatField.value = state.format || defaults.format;
+      stateForUrl();
+    }
+
     syncMode();
     validate(false);
+    scheduleSync();
     emit('tool_view');
     if (!(calcBtn instanceof HTMLButtonElement) || !calcBtn.disabled) calc();
   </script>

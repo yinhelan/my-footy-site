@@ -1,0 +1,45 @@
+<dialog id="history-modal" style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:520px;width:92%">
+  <form method="dialog">
+    <h3 style="margin:.2rem 0 1rem 0">选择历史赛事</h3>
+    <div style="display:grid;gap:10px">
+      <label>联赛
+        <select id="hp-league">
+          <option>Premier League</option>
+          <option>La Liga</option>
+          <option>UEFA Champions League</option>
+        </select>
+      </label>
+      <label>主队 <input id="hp-home" placeholder="e.g. Man City"></label>
+      <label>客队 <input id="hp-away" placeholder="e.g. Arsenal"></label>
+      <label>时间 <input id="hp-date" type="date"></label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn" value="cancel">取消</button>
+      <button class="btn brand" id="hp-go" value="default">去分析</button>
+    </div>
+  </form>
+</dialog>
+<script type="module">
+  const modal = document.getElementById('history-modal');
+  const go = document.getElementById('hp-go');
+  document.addEventListener('click', (e)=>{
+    const t = e.target;
+    if (t && (t as HTMLElement).id === 'btn-history') {
+      (modal as HTMLDialogElement).showModal();
+    }
+  });
+  go?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    const league = (document.getElementById('hp-league') as HTMLSelectElement).value;
+    const home = (document.getElementById('hp-home') as HTMLInputElement).value;
+    const away = (document.getElementById('hp-away') as HTMLInputElement).value;
+    const date = (document.getElementById('hp-date') as HTMLInputElement).value;
+    // 跳到 Poisson（示例），也可换成当前工具类型
+    const url = new URL('/tools/poisson/', window.location.origin);
+    if (home) url.searchParams.set('home', home);
+    if (away) url.searchParams.set('away', away);
+    if (league) url.searchParams.set('league', league);
+    if (date) url.searchParams.set('date', date);
+    window.location.href = url.toString();
+  });
+</script>

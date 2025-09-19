@@ -23,8 +23,8 @@ import MI_URL from '../../client/match-insights.client.js?url';
   </div>
   <form id="f" class="card grid">
     <div>
-      <label>λ(Home)<input id="lh" inputmode="decimal" value="1.45"/><small class="field-error" data-error-for="lh"></small></label>
-      <label>λ(Away)<input id="la" inputmode="decimal" value="1.20"/><small class="field-error" data-error-for="la"></small></label>
+      <label>λ(Home)<input id="lambdaHome" name="lh" inputmode="decimal" value="1.45"/><small class="field-error" data-error-for="lh"></small></label>
+      <label>λ(Away)<input id="lambdaAway" name="la" inputmode="decimal" value="1.20"/><small class="field-error" data-error-for="la"></small></label>
       <label>Max goals K（0..K）<input id="K" inputmode="numeric" value="8"/><small class="field-error" data-error-for="K"></small></label>
       <label>Bankroll<input id="bank" inputmode="decimal" value="1000"/><small class="field-error" data-error-for="bank"></small></label>
       <label>单注上限（比例，默认10%）<input id="cap" inputmode="decimal" value="0.10"/><small class="field-error" data-error-for="cap"></small></label>
@@ -34,50 +34,100 @@ import MI_URL from '../../client/match-insights.client.js?url';
       <label>Market odds - Draw<input id="od" value="3.40"/><small class="field-error" data-error-for="od"></small></label>
       <label>Market odds - Away<input id="oa" value="3.60"/><small class="field-error" data-error-for="oa"></small></label>
       <div style="margin-top:1rem;display:flex;gap:.6rem;flex-wrap:wrap">
-        <button type="button" id="calc">Calculate</button>
+        <button type="button" id="btn-calc">Calculate</button>
         <button type="button" id="copy">复制摘要</button>
         <button type="button" id="csv">导出 Top5 CSV</button>
       </div>
+      <input type="hidden" id="line" name="line" value="" />
     </div>
   </form>
 
-  <section class="card"><h2>Model 1X2（Poisson ⟶ 归一）</h2>
-    <div class="mono" id="modelLine"></div><div class="mono" id="fairLine"></div><div class="mono" id="tops"></div>
-  </section>
+  <div id="out">
+    <section class="card"><h2>Model 1X2（Poisson ⟶ 归一）</h2>
+      <div class="mono" id="modelLine"></div><div class="mono" id="fairLine"></div><div class="mono" id="tops"></div>
+    </section>
 
-  <section class="card"><h2>Market vs Model（含 Kelly）</h2>
-    <div class="mono" id="marketLine"></div><div class="mono" id="kellyLine"></div>
-    <small style="color:#666">当无优势时 Kelly=0；用单注上限控制 Half/Quarter Kelly。</small>
-  </section>
+    <section class="card"><h2>Market vs Model（含 Kelly）</h2>
+      <div class="mono" id="marketLine"></div><div class="mono" id="kellyLine"></div>
+      <small style="color:#666">当无优势时 Kelly=0；用单注上限控制 Half/Quarter Kelly。</small>
+    </section>
+  </div>
 
   <script type="module" src={MI_URL}></script>
 </AppLayout>
 
 <!-- lyra:tooling --><script src="/tooling.js" defer></script>
 <script type="module">
-  import { required, isNumber, inRange, compose } from '../../lib/validate.ts';
+  import { required, isNumber, inRange, compose } from '/src/lib/validate.ts';
+  import { decodeState, syncToUrl } from '/src/lib/shareableState.ts';
 
   const form = document.getElementById('f');
-  const calcBtn = document.getElementById('calc');
   const fillBtn = document.getElementById('btn-fill-example');
+  const aliasMap = {
+    lh: ['lh', 'lambdaHome'],
+    la: ['la', 'lambdaAway'],
+    line: ['line', 'ouLine'],
+    K: ['K'],
+    bank: ['bank'],
+    cap: ['cap'],
+    oh: ['oh'],
+    od: ['od'],
+    oa: ['oa'],
+    'btn-calc': ['btn-calc', 'calc'],
+  };
+
+  const getField = (id) => {
+    const candidates = aliasMap[id] || [id];
+    for (const candidate of candidates) {
+      const el = document.getElementById(candidate);
+      if (el) return el;
+    }
+    return null;
+  };
+
+  const calcBtn = getField('btn-calc');
+  const copyBtn = document.getElementById('copy');
+  const csvBtn = document.getElementById('csv');
+  const lineInput = getField('line');
+
   const emit = (event, detail = {}) => {
     window.dispatchEvent(new CustomEvent('analytics', { detail: { event, tool: 'match-insights', ...detail } }));
   };
 
   const fields = [
-    { name: 'lh', el: document.getElementById('lh'), validator: compose(required('请输入 λ(Home)'), isNumber(), inRange(0, 6, '推荐范围 0~6')) },
-    { name: 'la', el: document.getElementById('la'), validator: compose(required('请输入 λ(Away)'), isNumber(), inRange(0, 6, '推荐范围 0~6')) },
-    { name: 'K', el: document.getElementById('K'), validator: compose(required('请输入 K'), isNumber(), inRange(0, 15, '范围 0~15')) },
-    { name: 'bank', el: document.getElementById('bank'), validator: compose(required('请输入 Bankroll'), isNumber(), inRange(1, 1000000, '范围 1~1000000')) },
-    { name: 'cap', el: document.getElementById('cap'), validator: compose(required('请输入 单注上限'), isNumber(), inRange(0.01, 1, '范围 0.01~1')) },
-    { name: 'oh', el: document.getElementById('oh'), validator: compose(required('请输入 主胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
-    { name: 'od', el: document.getElementById('od'), validator: compose(required('请输入 平赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
-    { name: 'oa', el: document.getElementById('oa'), validator: compose(required('请输入 客胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
+    { name: 'lh', el: getField('lh'), validator: compose(required('请输入 λ(Home)'), isNumber(), inRange(0, 6, '推荐范围 0~6')) },
+    { name: 'la', el: getField('la'), validator: compose(required('请输入 λ(Away)'), isNumber(), inRange(0, 6, '推荐范围 0~6')) },
+    { name: 'K', el: getField('K'), validator: compose(required('请输入 K'), isNumber(), inRange(0, 15, '范围 0~15')) },
+    { name: 'bank', el: getField('bank'), validator: compose(required('请输入 Bankroll'), isNumber(), inRange(1, 1000000, '范围 1~1000000')) },
+    { name: 'cap', el: getField('cap'), validator: compose(required('请输入 单注上限'), isNumber(), inRange(0.01, 1, '范围 0.01~1')) },
+    { name: 'oh', el: getField('oh'), validator: compose(required('请输入 主胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
+    { name: 'od', el: getField('od'), validator: compose(required('请输入 平赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
+    { name: 'oa', el: getField('oa'), validator: compose(required('请输入 客胜赔率'), isNumber(), inRange(1.01, 50, '范围 1.01~50')) },
   ];
   const touched = new Set();
 
   const errorEl = (name) => document.querySelector(`[data-error-for="${name}"]`);
   const getValue = (el) => (el?.value ?? '').trim();
+
+  const stateForUrl = () => {
+    const lh = getValue(getField('lh'));
+    const la = getValue(getField('la'));
+    const line = lineInput instanceof HTMLInputElement ? lineInput.value.trim() : '';
+    return {
+      lh: lh || undefined,
+      la: la || undefined,
+      line: line || undefined,
+    };
+  };
+
+  let syncTimer = 0;
+  const scheduleSync = () => {
+    if (typeof location === 'undefined') return;
+    clearTimeout(syncTimer);
+    syncTimer = window.setTimeout(() => {
+      syncToUrl(stateForUrl());
+    }, 120);
+  };
 
   const validateField = (field, force = false) => {
     const value = getValue(field.el);
@@ -96,15 +146,30 @@ import MI_URL from '../../client/match-insights.client.js?url';
     return allOk;
   };
 
+  const assignValue = (name, value, { markTouched = false, trigger = true } = {}) => {
+    const el = getField(name);
+    if (!(el instanceof HTMLInputElement)) return;
+    const val = value ?? '';
+    el.value = val;
+    el.setAttribute('value', val);
+    if (markTouched) touched.add(name);
+    if (trigger) el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
   fields.forEach(({ name, el }) => {
-    if (!el) return;
+    if (!(el instanceof HTMLInputElement)) return;
     ['input', 'blur'].forEach((evt) => {
       el.addEventListener(evt, () => {
         touched.add(name);
         refresh(false);
+        scheduleSync();
       });
     });
   });
+
+  if (lineInput instanceof HTMLInputElement) {
+    lineInput.addEventListener('input', scheduleSync);
+  }
 
   if (calcBtn instanceof HTMLButtonElement) {
     calcBtn.disabled = true;
@@ -114,35 +179,40 @@ import MI_URL from '../../client/match-insights.client.js?url';
         return;
       }
       emit('calc_submit');
+      scheduleSync();
     });
   }
 
   if (fillBtn) {
     fillBtn.addEventListener('click', () => {
-      const setValue = (id, value) => {
-        const el = document.getElementById(id);
-        if (el instanceof HTMLInputElement) {
-          el.value = value;
-          touched.add(id);
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      };
-      setValue('lh', '1.45');
-      setValue('la', '1.10');
-      setValue('K', '8');
-      setValue('bank', '1000');
-      setValue('cap', '0.50');
-      setValue('oh', '2.30');
-      setValue('od', '3.30');
-      setValue('oa', '3.10');
+      assignValue('lh', '1.45', { markTouched: true });
+      assignValue('la', '1.10', { markTouched: true });
+      assignValue('K', '8', { markTouched: true });
+      assignValue('bank', '1000', { markTouched: true });
+      assignValue('cap', '0.50', { markTouched: true });
+      assignValue('oh', '2.30', { markTouched: true });
+      assignValue('od', '3.30', { markTouched: true });
+      assignValue('oa', '3.10', { markTouched: true });
+      assignValue('line', '2.5', { trigger: false });
       emit('example_fill_click');
+      const ok = refresh(true);
       if (calcBtn instanceof HTMLButtonElement) {
-        refresh(true);
-        if (!calcBtn.disabled) calcBtn.click();
+        calcBtn.disabled = !ok;
+        if (ok) calcBtn.click();
       }
+      scheduleSync();
     });
   }
 
-  emit('tool_view');
+  const defaults = { lh: '1.45', la: '1.20', line: '' };
+  if (typeof location !== 'undefined') {
+    const initial = decodeState(location.search, defaults);
+    assignValue('lh', String(initial.lh ?? defaults.lh), { trigger: false });
+    assignValue('la', String(initial.la ?? defaults.la), { trigger: false });
+    assignValue('line', String(initial.line ?? defaults.line ?? ''), { trigger: false });
+  }
+
   refresh(false);
+  scheduleSync();
+  emit('tool_view');
 </script>

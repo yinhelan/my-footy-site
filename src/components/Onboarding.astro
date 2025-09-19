@@ -1,0 +1,15 @@
+<div id="ob" class="container card" style="display:none;margin-top:16px">
+  <strong>3 步快速上手</strong>
+  <ol style="margin:.5rem 0;">
+    <li>选工具：顶部 Tools 下拉或首页快捷卡</li>
+    <li>输数据：输入球队/赔率/参数，可用分享链接回填</li>
+    <li>看结果：图表/矩阵/导出，边看边对照实时侧栏</li>
+  </ol>
+  <button class="btn" id="ob-close">知道了</button>
+</div>
+<script type="module">
+  const KEY='ob-v1';
+  const box=document.getElementById('ob'); const btn=document.getElementById('ob-close');
+  if(!localStorage.getItem(KEY)){ box!.style.display='block'; }
+  btn?.addEventListener('click',()=>{ localStorage.setItem(KEY,'1'); box!.remove(); });
+</script>

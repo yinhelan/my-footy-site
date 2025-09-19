@@ -1,0 +1,9 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const meta={ title:'xG 预期进球', description:'按球队/联赛/时间计算与对比 xG（示例页）。', lang:'zh-CN' };
+---
+<BaseLayout {...meta}>
+  <h1>xG 预期进球（占位）</h1>
+  <p>未来接入合规数据源后，在此展示 <strong>xG 变化曲线</strong> 与分段统计。</p>
+  <p>当前 URL 参数：{JSON.stringify(Object.fromEntries(new URL(Astro.url).searchParams), null, 2)}</p>
+</BaseLayout>

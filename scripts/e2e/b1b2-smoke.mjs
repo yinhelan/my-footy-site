@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const { chromium, webkit } = require('playwright-core');
 
+const CDP = 'http://127.0.0.1:9222';
+
 const wait = (ms)=>new Promise(r=>setTimeout(r,ms));
 const BASE = 'http://localhost:4321';
 const USER_DIR = path.resolve('.pw-data/chromium');
@@ -13,78 +15,52 @@ process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSER_ROOT;
 fs.mkdirSync(USER_DIR, { recursive: true });
 fs.mkdirSync(BROWSER_ROOT, { recursive: true });
 
-function findSystemChrome() {
-  const candidates = [
-    process.env.CHROME_PATH,
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
-  ].filter(Boolean);
-  for (const p of candidates) {
-    try { if (fs.existsSync(p)) return p; } catch {}
-  }
-  return null;
-}
-
 async function pageJSON(fn) {
   try { return await fn(); } catch (e) { return { error: String(e) }; }
 }
 
 async function launchContext() {
-  const commonArgs = [
-    '--headless=new',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--disable-dev-shm-usage',
-    '--disable-breakpad',
-    '--disable-features=Crashpad',
-    '--no-sandbox'
-  ];
-
-  const sysChrome = findSystemChrome();
-  if (sysChrome) {
-    try {
-      const ctx = await chromium.launchPersistentContext(USER_DIR, {
-        executablePath: sysChrome,
-        headless: true,
-        chromiumSandbox: false,
-        args: commonArgs
-      });
-      return { ctx, browser: null, engine: 'chrome-sys' };
-    } catch (e) {
-      console.error('system Chrome failed:', e.message);
-    }
+  // A. 优先连接到已运行的系统 Chrome（无沙箱）
+  try {
+    const browser = await chromium.connectOverCDP(CDP);
+    const ctx = await browser.newContext();
+    return { ctx, browser, engine: 'chrome-cdp' };
+  } catch (e) {
+    console.error('CDP connect failed:', e.message);
   }
 
+  // B. 回退：本地启动（禁 Crashpad/沙箱）
+  const USER_DIR = path.resolve('.pw-data/chromium');
+  fs.mkdirSync(USER_DIR, { recursive: true });
   try {
+    const sys = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    const hasSys = fs.existsSync(sys);
     const ctx = await chromium.launchPersistentContext(USER_DIR, {
+      executablePath: hasSys ? sys : undefined,
       headless: true,
       chromiumSandbox: false,
-      args: commonArgs
+      args: [
+        '--headless=new',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-dev-shm-usage',
+        '--disable-breakpad',
+        '--disable-features=Crashpad',
+        '--no-sandbox'
+      ]
     });
-    return { ctx, browser: null, engine: 'chromium' };
+    return { ctx, browser: null, engine: hasSys ? 'chrome-sys' : 'chromium' };
   } catch (e) {
-    console.error('bundled chromium failed:', e.message);
-  }
-
-  try {
+    console.error('local chromium failed:', e.message);
     const browser = await webkit.launch({ headless: true });
     const ctx = await browser.newContext();
     return { ctx, browser, engine: 'webkit' };
-  } catch (e) {
-    console.error('webkit failed:', e.message);
-    return { ctx: null, error: e };
   }
 }
 
 async function run() {
-  const launch = await launchContext();
-  if (!launch.ctx) {
-    console.log(JSON.stringify([
-      { case: 'BROWSER', error: launch.error ? String(launch.error) : 'launch failed' }
-    ], null, 2));
-    return;
-  }
-  const { ctx, browser, engine } = launch;
+  const { ctx, browser, engine } = await launchContext();
+  console.log('Engine:', engine);
   const out = [{ case: 'meta', engine }];
 
   // B1: Match Insights
