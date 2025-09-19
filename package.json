@@ -10,7 +10,8 @@
     "prebuild": "node scripts/gen-og.mjs",
     "dev:bg": "nohup pnpm run dev -- --port 4321 --host >/tmp/astro-4321.log 2>&1 & echo $! > /tmp/astro.pid && echo PID: $(cat /tmp/astro.pid)",
     "dev:stop": "kill $(cat /tmp/astro.pid) 2>/dev/null || true",
-    "logs": "tail -f /tmp/astro-4321.log"
+    "logs": "tail -f /tmp/astro-4321.log",
+    "e2e:b1b2": "node scripts/e2e/b1b2-smoke.mjs"
   },
   "dependencies": {
     "astro": "^5.13.5",
