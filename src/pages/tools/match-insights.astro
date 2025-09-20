@@ -53,6 +53,117 @@ import MI_URL from '../../client/match-insights.client.js?url';
     </section>
   </div>
 
+  <section id="mi-tool" style="margin:1rem 0; padding:1rem; border:1px solid #eee; border-radius:12px;">
+    <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+      <label>λ_home <input id="mi-lh" type="number" step="0.01" value="1.45" style="width:7rem"></label>
+      <label>λ_away <input id="mi-la" type="number" step="0.01" value="1.10" style="width:7rem"></label>
+      <label>maxGoals <input id="mi-max" type="number" step="1" value="10" style="width:6rem"></label>
+      <label>OU line <input id="mi-ou" type="number" step="0.5" value="2.5" style="width:6rem"></label>
+      <button id="mi-fill" data-testid="fill-example">填充示例</button>
+      <button id="mi-calc">计算</button>
+    </div>
+    <div id="mi-results" style="margin-top:1rem; display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:12px;">
+      <div id="mi-p1x2"  style="padding:12px; border:1px solid #eee; border-radius:10px;"></div>
+      <div id="mi-ou-card" style="padding:12px; border:1px solid #eee; border-radius:10px;"></div>
+      <div id="mi-btts"  style="padding:12px; border:1px solid #eee; border-radius:10px;"></div>
+      <div id="mi-top"   style="padding:12px; border:1px solid #eee; border-radius:10px;"></div>
+      <div id="mi-kelly" style="padding:12px; border:1px solid #eee; border-radius:10px; grid-column: 1 / -1;"></div>
+    </div>
+  </section>
+
+  <script type="module">
+    import { computeInsights } from "/src/lib/math/poisson.ts";
+    import { kelly } from "/src/lib/kelly.ts";
+    const fmtP = (x)=> (100*x).toFixed(1)+"%"; const f6=(x)=>x.toFixed(6); const f2=(x)=>x.toFixed(2);
+    function val(id){ const el=document.getElementById(id); return el && 'value' in el ? Number(el.value) : NaN; }
+    function render(){
+      const lh = val('mi-lh')||0, la = val('mi-la')||0, mg = Math.max(1, val('mi-max')||10), ou = val('mi-ou')||2.5;
+      const R = computeInsights(lh, la, mg, ou);
+
+      // 1X2 概率/公平价
+      const p = R.p1x2, px = R.fairPrice;
+      document.getElementById('mi-p1x2').innerHTML =
+        `<h3 style="margin:0 0 .5rem 0;">1X2 概率 / 公平价</h3>
+         <div>H: ${fmtP(p.H)}（￥${f2(px.H)}）</div>
+         <div>D: ${fmtP(p.D)}（￥${f2(px.D)}）</div>
+         <div>A: ${fmtP(p.A)}（￥${f2(px.A)}）</div>`;
+
+      // O/U
+      const oux = R.overUnder;
+      document.getElementById('mi-ou-card').innerHTML =
+        `<h3 style="margin:0 0 .5rem 0;">O/U @ ${ou}</h3>
+         <div>Over: ${fmtP(oux.over)} / Under: ${fmtP(1-oux.over)}</div>`;
+
+      // BTTS
+      const b = R.btts;
+      document.getElementById('mi-btts').innerHTML =
+        `<h3 style="margin:0 0 .5rem 0;">BTTS</h3>
+         <div>Yes: ${fmtP(b.yes)} / No: ${fmtP(b.no)}</div>`;
+
+      // Top-5 正确比分
+      const rows = R.topCorrectScores.map((r)=>`<tr><td>${r.score}</td><td>${f6(r.prob)}</td></tr>`).join('');
+      document.getElementById('mi-top').innerHTML =
+        `<h3 style="margin:0 0 .5rem 0;">Top-5 正确比分</h3>
+         <table><thead><tr><th>比分</th><th>概率</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+      // Kelly（默认盘口 2.30，可切换分数Kelly）
+      const marketSelEl = document.getElementById('mi-kelly-market');
+      const marketSel = marketSelEl && 'value' in marketSelEl ? marketSelEl.value : 'H';
+      const decOddsEl = document.getElementById('mi-kelly-odds');
+      const bankrollEl = document.getElementById('mi-bankroll');
+      const fracEl = document.getElementById('mi-fraction');
+      const decOdds = decOddsEl && 'value' in decOddsEl ? Number(decOddsEl.value) : 2.30;
+      const bankroll = bankrollEl && 'value' in bankrollEl ? Number(bankrollEl.value) : 1000;
+      const frac = fracEl && 'value' in fracEl ? Number(fracEl.value) : 1;
+
+      const fp = marketSel==='H'? p.H : (marketSel==='D'? p.D : p.A);
+      const K = kelly(decOdds, fp, bankroll, frac);
+      const k100 = (100*K.fStar).toFixed(1) + '%';
+      const half = (bankroll * K.fStar * 0.5).toFixed(2), quarter = (bankroll * K.fStar * 0.25).toFixed(2);
+      const lineText = `Kelly 比例：${k100} · Half Kelly：${half} · Quarter Kelly：${quarter}`;
+
+      document.getElementById('mi-kelly').innerHTML =
+        `<h3 style="margin:0 0 .5rem 0;">Kelly</h3>
+         <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+           <label>市场
+             <select id="mi-kelly-market">
+               <option value="H" ${marketSel==='H'?'selected':''}>H</option>
+               <option value="D" ${marketSel==='D'?'selected':''}>D</option>
+               <option value="A" ${marketSel==='A'?'selected':''}>A</option>
+             </select>
+           </label>
+           <label>盘口赔率(十进制) <input id="mi-kelly-odds" type="number" step="0.01" value="${decOdds}" style="width:7rem"></label>
+           <label>分数Kelly
+             <select id="mi-fraction">
+               <option value="1" ${frac===1?'selected':''}>1</option>
+               <option value="0.5" ${frac===0.5?'selected':''}>1/2</option>
+               <option value="0.25" ${frac===0.25?'selected':''}>1/4</option>
+             </select>
+           </label>
+           <label>资金 <input id="mi-bankroll" type="number" step="10" value="${bankroll}" style="width:7rem"></label>
+           <button id="mi-kelly-recalc">重算</button>
+         </div>
+         <div id="kellyLine" style="margin-top:.5rem;">${lineText}</div>`;
+      const legacyLine = document.querySelector('#out #kellyLine');
+      if (legacyLine) legacyLine.textContent = lineText;
+
+      // e2e 钩子
+      window.__mi_render__ = render;
+    }
+    function wire(){
+      const fill = document.getElementById('mi-fill');
+      fill?.addEventListener('click', ()=>{
+        const set=(id,v)=>{const el=document.getElementById(id); if(el&&'value'in el) el.value=String(v);};
+        set('mi-lh',1.45); set('mi-la',1.10); set('mi-max',10); set('mi-ou',2.5); render();
+      });
+      document.getElementById('mi-calc')?.addEventListener('click', (e)=>{ e.preventDefault(); render(); });
+      document.addEventListener('change', (ev)=>{ const id=(ev.target&&ev.target.id)||''; if(['mi-ou','mi-lh','mi-la','mi-max','mi-kelly-market','mi-kelly-odds','mi-fraction','mi-bankroll'].includes(id)) render(); });
+      document.addEventListener('click', (ev)=>{ const id=(ev.target&&ev.target.id)||''; if(id==='mi-kelly-recalc') render(); });
+      render();
+    }
+    wire();
+  </script>
+
   <script type="module" src={MI_URL}></script>
 </AppLayout>
 
