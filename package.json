@@ -8,15 +8,17 @@
     "preview": "astro preview",
     "astro": "astro",
     "prebuild": "node scripts/gen-og.mjs",
-    "dev:bg": "nohup pnpm run dev -- --port 4321 --host >/tmp/astro-4321.log 2>&1 & echo $! > /tmp/astro.pid && echo PID: $(cat /tmp/astro.pid)",
+    "dev:bg": "nohup pnpm run dev -- --port 4321 --host 127.0.0.1 >/tmp/astro-4321.log 2>&1 & echo $! > /tmp/astro.pid && echo PID: $(cat /tmp/astro.pid)",
     "dev:stop": "kill $(cat /tmp/astro.pid) 2>/dev/null || true",
     "logs": "tail -f /tmp/astro-4321.log",
     "e2e:b1b2": "node scripts/e2e/b1b2-smoke.mjs",
     "e2e:b1b2:cdp": "node scripts/e2e/b1b2-smoke.mjs",
-    "e2e:b1b2:syschrome": "CHROME_PATH=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" node scripts/e2e/b1b2-smoke.mjs"
+    "e2e:b1b2:syschrome": "CHROME_PATH=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" node scripts/e2e/b1b2-smoke.mjs",
+    "e2e:b5": "node scripts/e2e/b5-smoke.mjs"
   },
   "dependencies": {
     "astro": "^5.13.5",
+    "html2canvas": "^1.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

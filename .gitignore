@@ -28,3 +28,6 @@ _bak/
 
 .pw-browsers/
 .pw-data/
+
+# E2E artifacts
+/tmp/
