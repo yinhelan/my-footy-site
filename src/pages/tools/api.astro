@@ -1,0 +1,48 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+const title = 'API Health · Footy Analytics';
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Footy API Health",
+  "applicationCategory": "SportsApplication",
+  "operatingSystem": "Web",
+  "url": Astro.request.url,
+};
+---
+
+<AppLayout title={title} description="Check server-side proxies for football APIs" jsonLd={jsonLd} active="tools">
+  <style>
+    :root{--w:720px}
+    .card{border:1px solid #eee;border-radius:12px;padding:1rem}
+    pre{white-space:pre-wrap;word-break:break-word}
+    button{padding:.6rem .9rem;border-radius:.6rem;border:1px solid #ddd;background:#fafafa;cursor:pointer}
+  </style>
+
+  <h1>API Health</h1>
+  <p class="text-sm text-neutral-600">Calls Cloudflare Pages Functions (server-side) so secrets stay on the server.</p>
+
+  <div class="card" style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+    <button id="run">Run health check</button>
+    <a class="text-sm" href="/api/health" target="_blank" rel="noreferrer">Open /api/health</a>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h2 class="text-lg font-semibold">Result</h2>
+    <pre id="out">(not run)</pre>
+  </div>
+
+  <script type="module">
+    const out = document.getElementById('out');
+    document.getElementById('run').addEventListener('click', async () => {
+      out.textContent = 'Loading...';
+      try {
+        const r = await fetch('/api/health', { cache: 'no-store' });
+        const t = await r.text();
+        out.textContent = t;
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    });
+  </script>
+</AppLayout>
