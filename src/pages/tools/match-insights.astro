@@ -11,7 +11,9 @@ const jsonLd = {
     :root { --w: 720px; }
     section, .card{border:1px solid #eee;border-radius:12px;padding:1rem}
     .mono{font-variant-numeric:tabular-nums;white-space:pre-wrap}
-    label{display:block;margin:.5rem 0 .25rem} input{width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem}
+    label{display:block;margin:.5rem 0 .25rem}
+    input{width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem}
+    select{width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     button{padding:.6rem .9rem;border-radius:.6rem;border:1px solid #ddd;background:#fafafa;cursor:pointer}
     h2{margin-top:1.2rem}
@@ -19,6 +21,35 @@ const jsonLd = {
   </style>
 
   <h1>Match Insights</h1>
+  <p class="note">已接入实时数据：从 Cloudflare Pages Functions（服务端）拉取赛程与 1X2 赔率，不在前端暴露 key。</p>
+
+  <section class="card" style="margin-bottom:1rem">
+    <h2 style="margin:0 0 .6rem">Real data（fixtures + odds）</h2>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div>
+        <label>League（API-Sports league id）</label>
+        <select id="league" style="width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem">
+          <option value="39">英超 Premier League (39)</option>
+          <option value="140">西甲 La Liga (140)</option>
+          <option value="135">意甲 Serie A (135)</option>
+          <option value="78">德甲 Bundesliga (78)</option>
+          <option value="61">法甲 Ligue 1 (61)</option>
+        </select>
+        <label>Season</label><input id="season" inputmode="numeric" value="2025"/>
+        <label>Date（YYYY-MM-DD）</label><input id="date" type="date" />
+        <div style="margin-top:.8rem;display:flex;gap:.6rem;flex-wrap:wrap">
+          <button id="loadFixtures" type="button">Load fixtures</button>
+          <button id="loadOdds" type="button">Load odds (1X2)</button>
+        </div>
+      </div>
+      <div>
+        <label>Fixture</label>
+        <select id="fixture" style="width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem"></select>
+        <small class="note">选择比赛后点 “Load odds”，会自动回填右侧 Market odds。</small>
+        <div class="mono" id="dataStatus" style="margin-top:.6rem"></div>
+      </div>
+    </div>
+  </section>
 
   <form id="f" class="card grid" onsubmit="return false;">
     <div>
@@ -53,6 +84,105 @@ const jsonLd = {
     import { kellyFrac, stake } from '../../lib/kelly.ts';
     import { copy as copyTxt, downloadCSV } from '../../lib/share.ts';
     const $ = (id)=>document.getElementById(id), toNumber=(s)=>Number(String(s).replace(',', '.'));
+
+    function setStatus(s){ $('dataStatus').textContent = s || ''; }
+
+    function todayShanghaiISO(){
+      // Avoid timezone confusion: use user's local date picker default
+      const d = new Date();
+      const pad = (n)=>String(n).padStart(2,'0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+
+    async function loadFixtures(){
+      const league = $('league').value;
+      const season = $('season').value;
+      const date = $('date').value;
+      setStatus('Loading fixtures...');
+      $('fixture').innerHTML = '';
+
+      const u = new URL('/api/api-sports/fixtures', window.location.origin);
+      u.searchParams.set('league', league);
+      u.searchParams.set('season', season);
+      u.searchParams.set('date', date);
+      u.searchParams.set('timezone', 'Asia/Shanghai');
+
+      const r = await fetch(u);
+      const j = await r.json();
+      if (!r.ok) { setStatus(`Fixtures error: ${r.status} ${JSON.stringify(j)}`); return; }
+
+      const list = (j?.response || []).map((fx)=>{
+        const id = fx?.fixture?.id;
+        const dt = fx?.fixture?.date;
+        const home = fx?.teams?.home?.name;
+        const away = fx?.teams?.away?.name;
+        const status = fx?.fixture?.status?.short;
+        return { id, label: `${home} vs ${away} · ${dt} · ${status}` };
+      }).filter(x=>x.id);
+
+      if (!list.length){ setStatus('No fixtures found for this date/league/season.'); return; }
+
+      list.forEach((x,i)=>{
+        const opt = document.createElement('option');
+        opt.value = String(x.id);
+        opt.textContent = x.label;
+        if (i===0) opt.selected = true;
+        $('fixture').appendChild(opt);
+      });
+
+      setStatus(`Fixtures loaded: ${list.length}`);
+    }
+
+    function pick1x2OddsFromApiSports(payload){
+      // payload shape: { response: [ { bookmakers:[{ bets:[{ name, values:[{ value, odd }] }]}]}] }
+      const resp = payload?.response?.[0];
+      const bms = resp?.bookmakers || [];
+      for (const bm of bms){
+        for (const bet of (bm?.bets || [])){
+          const name = String(bet?.name || '').toLowerCase();
+          if (!name.includes('match winner') && !name.includes('1x2') && !name.includes('胜平负')) continue;
+          const vals = bet?.values || [];
+          const getOdd = (k)=>{
+            const hit = vals.find(v=>String(v?.value||'').toLowerCase()===k);
+            const odd = hit ? Number(hit.odd) : NaN;
+            return Number.isFinite(odd) ? odd : null;
+          };
+          const home = getOdd('home');
+          const draw = getOdd('draw');
+          const away = getOdd('away');
+          if (home && draw && away) return { home, draw, away, bookmaker: bm?.name, betName: bet?.name };
+        }
+      }
+      return null;
+    }
+
+    async function loadOdds(){
+      const fixture = $('fixture').value;
+      if (!fixture){ setStatus('Pick a fixture first.'); return; }
+      setStatus('Loading odds...');
+
+      const u = new URL('/api/api-sports/odds', window.location.origin);
+      u.searchParams.set('fixture', fixture);
+      // Optional: set bookmaker=8 (Bet365) for consistency; leave open to whatever is available.
+      // u.searchParams.set('bookmaker','8');
+
+      const r = await fetch(u);
+      const j = await r.json();
+      if (!r.ok) { setStatus(`Odds error: ${r.status} ${JSON.stringify(j)}`); return; }
+
+      const pick = pick1x2OddsFromApiSports(j);
+      if (!pick){
+        setStatus('Odds loaded but could not find 1X2 (Match Winner) in response. Try another league/date or set bookmaker filter.');
+        return;
+      }
+
+      $('oh').value = String(pick.home);
+      $('od').value = String(pick.draw);
+      $('oa').value = String(pick.away);
+      setStatus(`Odds OK (${pick.bookmaker || 'bookmaker?'} / ${pick.betName || 'Match Winner'}) → filled Market odds.`);
+      calc();
+    }
+
     function calc(){
       const lh=toNumber($('lh').value), la=toNumber($('la').value), K=Math.max(0, parseInt($('K').value||'8'));
       const bank=toNumber($('bank').value), cap=toNumber($('cap').value||'0.10')||0.10;
@@ -68,6 +198,9 @@ const jsonLd = {
       $('kellyLine').textContent=`Kelly stake(¥)  H ${kH.toFixed(2)} · D ${kD.toFixed(2)} · A ${kA.toFixed(2)}   (cap ${(cap*100).toFixed(0)}%)`;
       return { lh,la,K,bank,cap,oh,od,oa,model,overround,topsArr: topScorelines(mat,5) };
     }
+
+    $('loadFixtures').addEventListener('click',()=>loadFixtures().catch(e=>setStatus(String(e))));
+    $('loadOdds').addEventListener('click',()=>loadOdds().catch(e=>setStatus(String(e))));
     $('calc').addEventListener('click',()=>calc());
     $('copy').addEventListener('click',async()=>{ const r=calc(); const text=[
       `λ(H)=${r.lh}, λ(A)=${r.la}, K=${r.K}`,
@@ -76,6 +209,10 @@ const jsonLd = {
       'Top scorelines: '+r.topsArr.map(x=>`${x.h}-${x.a} ${fmtPct(x.p)}`).join(', ')
     ].join('\n'); await copyTxt(text); alert('已复制摘要'); });
     $('csv').addEventListener('click',()=>{ const r=calc(); const rows=[['home','away','prob']]; r.topsArr.forEach(x=>rows.push([x.h,x.a,(x.p*100).toFixed(2)+'%'])); downloadCSV('top-scorelines.csv',rows); });
+
+    // Init
+    $('date').value = todayShanghaiISO();
+    $('fixture').innerHTML = '<option value="">(load fixtures first)</option>';
     calc();
   </script>
 </AppLayout>
