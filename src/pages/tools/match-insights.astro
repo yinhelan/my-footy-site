@@ -254,12 +254,73 @@ const jsonLd = {
     return { home: homeP, draw: drawP, away: awayP, bookmaker: bm.title || bm.key };
   }
 
+  async function apiSportsFindFixture(meta, season = '2024') {
+    const cfg = LEAGUES[meta.leagueKey];
+    if (!cfg?.apiSportsLeague) throw new Error('api-sports league mapping missing');
+
+    const date = String(meta.utcDate || '').slice(0, 10);
+    const u = new URL('/api/api-sports/fixtures', window.location.origin);
+    u.searchParams.set('league', String(cfg.apiSportsLeague));
+    u.searchParams.set('season', String(season));
+    u.searchParams.set('date', date);
+    u.searchParams.set('timezone', 'UTC');
+
+    const r = await fetch(u);
+    const j = await r.json();
+    if (!r.ok) throw new Error('API-Sports fixtures error: ' + r.status + ' ' + JSON.stringify(j));
+
+    const list = j?.response || [];
+    const th = normTeam(meta.home);
+    const ta = normTeam(meta.away);
+
+    const hit = list.find((x) => {
+      const h = normTeam(x?.teams?.home?.name);
+      const a = normTeam(x?.teams?.away?.name);
+      return (h === th && a === ta) || (h === ta && a === th);
+    });
+
+    return hit?.fixture?.id || null;
+  }
+
+  function pick1x2FromApiSportsOdds(payload, meta) {
+    const entry = (payload?.response || [])[0];
+    if (!entry) return null;
+
+    const bms = entry?.bookmakers || [];
+    const bm = bms[0];
+    if (!bm) return null;
+
+    const bets = bm?.bets || [];
+    const bet =
+      bets.find((b) => String(b?.name || '').toLowerCase().includes('match winner')) ||
+      bets.find((b) => String(b?.name || '').toLowerCase() === '1x2') ||
+      bets[0];
+    if (!bet) return null;
+
+    const vals = bet?.values || [];
+    const getOdd = (candidates) => {
+      for (const nm of candidates) {
+        const hit = vals.find((v) => String(v?.value || '').toLowerCase() === String(nm).toLowerCase());
+        const o = hit ? Number(hit?.odd) : NaN;
+        if (Number.isFinite(o)) return o;
+      }
+      return null;
+    };
+
+    const home = getOdd(['Home', '1', meta.home]);
+    const draw = getOdd(['Draw', 'X']);
+    const away = getOdd(['Away', '2', meta.away]);
+    if (!home || !draw || !away) return null;
+
+    return { home, draw, away, bookmaker: bm?.name || 'api-sports' };
+  }
+
   const LEAGUES = {
-    epl: { footballData: 'PL', oddsApiSport: 'soccer_epl' },
-    laliga: { footballData: 'PD', oddsApiSport: 'soccer_spain_la_liga' },
-    seriea: { footballData: 'SA', oddsApiSport: 'soccer_italy_serie_a' },
-    bundesliga: { footballData: 'BL1', oddsApiSport: 'soccer_germany_bundesliga' },
-    ligue1: { footballData: 'FL1', oddsApiSport: 'soccer_france_ligue_one' },
+    epl: { footballData: 'PL', oddsApiSport: 'soccer_epl', apiSportsLeague: '39' },
+    laliga: { footballData: 'PD', oddsApiSport: 'soccer_spain_la_liga', apiSportsLeague: '140' },
+    seriea: { footballData: 'SA', oddsApiSport: 'soccer_italy_serie_a', apiSportsLeague: '135' },
+    bundesliga: { footballData: 'BL1', oddsApiSport: 'soccer_germany_bundesliga', apiSportsLeague: '78' },
+    ligue1: { footballData: 'FL1', oddsApiSport: 'soccer_france_ligue_one', apiSportsLeague: '61' },
   };
 
   window.__fixturesMeta = {};
@@ -324,8 +385,37 @@ const jsonLd = {
     const oddsSource = $('oddsSource')?.value || 'odds-api';
     setStatus(`Loading odds (${oddsSource})...`);
 
+    if (oddsSource === 'api-sports') {
+      // NOTE: API-Sports free plan commonly supports up to season 2024.
+      const season = '2024';
+      const fixtureId = await apiSportsFindFixture(meta, season);
+      if (!fixtureId) {
+        return void setStatus('API-Sports: 找不到对应 fixture（可能是球队名不一致/该日期无数据/赛季不支持）。');
+      }
+
+      const u2 = new URL('/api/api-sports/odds', window.location.origin);
+      u2.searchParams.set('fixture', String(fixtureId));
+
+      const bm = String($('bookmaker')?.value || '').trim();
+      if (/^\d+$/.test(bm)) u2.searchParams.set('bookmaker', bm);
+
+      const r2 = await fetch(u2);
+      const j2 = await r2.json();
+      if (!r2.ok) return void setStatus(`API-Sports odds error: ${r2.status} ${JSON.stringify(j2)}`);
+
+      const pick2 = pick1x2FromApiSportsOdds(j2, meta);
+      if (!pick2) return void setStatus('API-Sports: 未解析到 1X2 赔率（可换 bookmaker 或稍后再试）。');
+
+      $('oh').value = String(pick2.home);
+      $('od').value = String(pick2.draw);
+      $('oa').value = String(pick2.away);
+      setStatus(`Odds OK (API-Sports ${pick2.bookmaker}) → filled Market odds.`);
+      calc();
+      return;
+    }
+
     if (oddsSource !== 'odds-api') {
-      return void setStatus('API-Sports mapping not implemented yet. Use the-odds-api for now.');
+      return void setStatus('Unsupported odds source.');
     }
 
     const u = new URL('/api/odds/odds', window.location.origin);
