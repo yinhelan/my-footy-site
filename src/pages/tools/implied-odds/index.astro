@@ -28,20 +28,71 @@ const jsonLd = {"@context":"https://schema.org","@type":"SoftwareApplication","n
   </div>
 
   <script type="module">
-    import { parseOdds, fairFromBook, fmtPct, fmtOdds } from '../../../lib/odds.ts';
-    const rows = document.getElementById('rows'); const tb = document.getElementById('tb'); const ovr = document.getElementById('ovr');
-    function addRow(val='2.00'){ const d=document.createElement('div'); d.className='row';
-      d.innerHTML = `<input value="${val}"/><div></div><button aria-label="删除">×</button>`; rows.appendChild(d);
-      d.querySelector('button')!.onclick=()=>d.remove();
+  const $ = (id) => document.getElementById(id);
+
+  function parseOdds(input) {
+    const s = String(input || '').trim().replace(',', '.');
+    if (!s) throw new Error('empty odds');
+    if (/^\s*\d+\s*\/\s*\d+\s*$/.test(s)) {
+      const [a, b] = s.split('/').map(Number);
+      if (!b) throw new Error('invalid fractional');
+      return 1 + a / b;
     }
-    document.getElementById('add')!.addEventListener('click',()=>addRow('3.00'));
-    ['2.10','3.40','3.60'].forEach(addRow);
-    function calc(){
-      const odds = [...rows.querySelectorAll('input')].map(i=>parseOdds((i as HTMLInputElement).value)).filter(Boolean);
+    if (/^[+-]?\d+$/.test(s)) {
+      const n = Number(s);
+      if (n >= 100) return 1 + n / 100;
+      if (n <= -100) return 1 + 100 / Math.abs(n);
+    }
+    const d = Number(s);
+    if (!Number.isFinite(d) || d <= 1) throw new Error('invalid decimal odds');
+    return d;
+  }
+
+  const fmtPct = (x, d = 2) => (x * 100).toFixed(d) + '%';
+  const fmtOdds = (x, d = 2) => Number(x).toFixed(d);
+
+  const impliedProb = (odds) => 1 / odds;
+  function fairFromBook(oddsList) {
+    const implied = oddsList.map(impliedProb);
+    const sum = implied.reduce((a, b) => a + b, 0);
+    const fairProb = implied.map((p) => p / sum);
+    const fairOdds = fairProb.map((p) => 1 / p);
+    return { fairProb, fairOdds, overround: sum - 1 };
+  }
+
+  const rows = $('rows');
+  const tb = $('tb');
+  const ovr = $('ovr');
+
+  function addRow(val = '2.00') {
+    const d = document.createElement('div');
+    d.className = 'row';
+    d.innerHTML = `<input value="${val}"/><div></div><button aria-label="删除">×</button>`;
+    rows.appendChild(d);
+    d.querySelector('button').addEventListener('click', () => d.remove());
+  }
+
+  $('add').addEventListener('click', () => addRow('3.00'));
+  ['2.10', '3.40', '3.60'].forEach(addRow);
+
+  function calc() {
+    try {
+      const odds = [...rows.querySelectorAll('input')].map((i) => parseOdds(i.value));
       const { fairProb, fairOdds, overround } = fairFromBook(odds);
-      tb.innerHTML = odds.map((o,i)=>`<tr><td>${i+1}</td><td>${fmtOdds(o)}</td><td>${fmtPct(1/o)}</td><td>${fmtPct(fairProb[i])}</td><td>${fmtOdds(fairOdds[i])}</td></tr>`).join('');
-      ovr.textContent = `Overround: ${(overround*100).toFixed(2)}%`;
+      tb.innerHTML = odds
+        .map(
+          (o, i) =>
+            `<tr><td>${i + 1}</td><td>${fmtOdds(o)}</td><td>${fmtPct(1 / o)}</td><td>${fmtPct(fairProb[i])}</td><td>${fmtOdds(fairOdds[i])}</td></tr>`
+        )
+        .join('');
+      ovr.textContent = `Overround: ${(overround * 100).toFixed(2)}%`;
+    } catch (e) {
+      tb.innerHTML = '';
+      ovr.textContent = 'Error: ' + String(e);
     }
-    document.getElementById('calc')!.addEventListener('click',calc); calc();
-  </script>
+  }
+
+  $('calc').addEventListener('click', calc);
+  calc();
+</script>
 </AppLayout>
