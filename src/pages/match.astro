@@ -63,7 +63,7 @@ const season = Astro.url.searchParams.get('season') ?? '';
   <div class="card" style="margin-top:1rem">
     <h2 style="margin-top:0">快照列表</h2>
     <table>
-      <thead><tr><th>time</th><th>source</th><th>league</th><th>season</th><th>fixture</th><th>bookmaker</th></tr></thead>
+      <thead><tr><th>time</th><th>source</th><th>league</th><th>bookmaker</th><th>line</th><th>home</th><th>away</th></tr></thead>
       <tbody id="tb"></tbody>
     </table>
   </div>
@@ -146,20 +146,25 @@ const season = Astro.url.searchParams.get('season') ?? '';
     async function listSnapshots(){
       const id=String($('fid').value||'').trim();
       if(!id) return alert('请输入 fid(matchId)');
-      const u=new URL('/api/track/snapshots', location.origin);
+      const u=new URL('/api/track/snapshots_spreads', location.origin);
       u.searchParams.set('matchId', id);
       const r=await fetch(u);
       const j=await r.json();
-      if(!r.ok){ $('tb').innerHTML = `<tr><td colspan="6">error: ${r.status} ${jfmt(j)}</td></tr>`; return; }
+      if(!r.ok){ $('tb').innerHTML = `<tr><td colspan="7">error: ${r.status} ${jfmt(j)}</td></tr>`; return; }
       const rows=j.rows||[];
       $('tb').innerHTML = rows.map(x=>{
-        return `<tr><td>${x.created_at}</td><td>${x.source}</td><td>${x.league_key||''}</td><td>${x.season||''}</td><td>${x.api_fixture_id||''}</td><td>${x.bookmaker_id||''}</td></tr>`;
+        const sp=x.spreads||null;
+        const line=sp? (sp.home?.point ?? '') : '';
+        const h=sp? (sp.home?.price ?? '') : '';
+        const a=sp? (sp.away?.price ?? '') : '';
+        const bm=(sp && (sp.bookmaker||sp.key)) ? (sp.bookmaker||sp.key) : (x.bookmaker_id||'');
+        return `<tr><td>${x.created_at}</td><td>${x.source}</td><td>${x.league_key||''}</td><td>${bm||''}</td><td>${line}</td><td>${h}</td><td>${a}</td></tr>`;
       }).join('');
     }
 
     $('loadMeta').addEventListener('click', ()=>loadMeta().catch(e=>set($('meta'), String(e))));
     $('snap').addEventListener('click', ()=>snapshotAH().catch(e=>set($('ah'), String(e))));
-    $('list').addEventListener('click', ()=>listSnapshots().catch(e=>$('tb').innerHTML=`<tr><td colspan="6">${String(e)}</td></tr>`));
+    $('list').addEventListener('click', ()=>listSnapshots().catch(e=>$('tb').innerHTML=`<tr><td colspan="7">${String(e)}</td></tr>`));
 
     // init
     $('date').value = $('date').value || todayISO();
