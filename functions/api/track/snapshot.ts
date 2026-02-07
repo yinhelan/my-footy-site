@@ -10,6 +10,19 @@ function normTeam(s: string) {
     .trim();
 }
 
+function normalizeTeamMore(s: string) {
+  return normTeam(s)
+    .replace(/manchester united/g, 'man utd')
+    .replace(/manchester city/g, 'man city')
+    .replace(/tottenham hotspur/g, 'tottenham')
+    .replace(/wolverhampton wanderers/g, 'wolves')
+    .replace(/internazionale/g, 'inter')
+    .replace(/atalanta bc/g, 'atalanta')
+    .replace(/borussia dortmund/g, 'dortmund')
+    .replace(/bayern munchen/g, 'bayern')
+    .replace(/paris saint germain/g, 'psg');
+}
+
 function timeDistanceMinutes(aIso: string, bIso: string) {
   const a = Date.parse(aIso);
   const b = Date.parse(bIso);
@@ -37,14 +50,14 @@ async function apiSportsFindFixture(params: {
   if (!r.ok) throw new Error(`API-Sports fixtures error: ${r.status} ${JSON.stringify(j)}`);
 
   const list = j?.response || [];
-  const th = normTeam(params.home);
-  const ta = normTeam(params.away);
+  const th = normalizeTeamMore(params.home);
+  const ta = normalizeTeamMore(params.away);
   const targetTime = String(params.utcDate);
 
   const candidates = list
     .map((x: any) => {
-      const h = normTeam(x?.teams?.home?.name);
-      const a = normTeam(x?.teams?.away?.name);
+      const h = normalizeTeamMore(x?.teams?.home?.name);
+      const a = normalizeTeamMore(x?.teams?.away?.name);
       const sameTeams = (h === th && a === ta) || (h === ta && a === th);
       const mins = timeDistanceMinutes(String(x?.fixture?.date || ''), targetTime);
       return { x, sameTeams, mins };
@@ -143,13 +156,12 @@ export const onRequestPost: PagesFunction = async (context) => {
   const matchId = url.searchParams.get('matchId');
   const leagueKey = url.searchParams.get('leagueKey');
   const season = url.searchParams.get('season') || '2024';
-  const bookmakerId = url.searchParams.get('bookmaker'); // optional numeric
+  const bookmakerId = url.searchParams.get('bookmaker');
 
   if (!matchId || !leagueKey) return json({ ok: false, error: 'missing matchId or leagueKey' }, { status: 400 });
 
   const origin = new URL(context.request.url).origin;
 
-  // 1) load match meta
   const metaFromQuery = {
     utcDate: url.searchParams.get('utcDate') || '',
     home: url.searchParams.get('home') || '',
@@ -158,7 +170,6 @@ export const onRequestPost: PagesFunction = async (context) => {
 
   let meta = metaFromQuery;
   if (!(meta.utcDate && meta.home && meta.away)) {
-    // fallback to football-data single match endpoint
     const uMatch = new URL('/api/football-data/match', origin);
     uMatch.searchParams.set('id', matchId);
     const rMatch = await fetch(uMatch);
@@ -191,11 +202,9 @@ export const onRequestPost: PagesFunction = async (context) => {
   const leagueId = LEAGUE_MAP[String(leagueKey)] || '';
   if (!leagueId) return json({ ok: false, error: 'unknown leagueKey for api-sports' }, { status: 400 });
 
-  // 2) map to api-sports fixture
   const fixtureId = await apiSportsFindFixture({ origin, leagueId, season, ...meta });
   if (!fixtureId) return json({ ok: false, error: 'api-sports fixture not found', meta }, { status: 404 });
 
-  // 3) fetch odds then parse asian handicap
   const uOdds = new URL('/api/api-sports/odds', origin);
   uOdds.searchParams.set('fixture', String(fixtureId));
   if (bookmakerId && /^\d+$/.test(bookmakerId)) uOdds.searchParams.set('bookmaker', bookmakerId);
