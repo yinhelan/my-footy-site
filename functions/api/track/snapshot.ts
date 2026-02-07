@@ -56,43 +56,86 @@ async function apiSportsFindFixture(params: {
   return hit?.x?.fixture?.id || null;
 }
 
-function pickAsianHandicapFromApiSportsOdds(payload: any) {
+function impliedNoVig(oddsA: number, oddsB: number) {
+  const pa = 1 / oddsA;
+  const pb = 1 / oddsB;
+  const sum = pa + pb;
+  return { pA: pa / sum, pB: pb / sum, overround: sum - 1 };
+}
+
+function pickAsianHandicapFromApiSportsOdds(payload: any, meta: { home: string; away: string }) {
   const entry = (payload?.response || [])[0];
   if (!entry) return null;
 
   const bm = (entry?.bookmakers || [])[0];
   if (!bm) return null;
 
-  // Find Asian Handicap bet
   const bets = bm?.bets || [];
   const bet =
     bets.find((b: any) => String(b?.name || '').toLowerCase().includes('asian handicap')) ||
     bets.find((b: any) => String(b?.name || '').toLowerCase().includes('handicap'));
   if (!bet) return null;
 
-  // values typically include line like "-0.5" for Home/Away
   const vals = bet?.values || [];
-  const lines = new Map<string, any[]>();
+  const byLine = new Map<string, { value: string; odd: number }[]>();
+
   for (const v of vals) {
     const value = String(v?.value || '');
-    // try split: "Home -0.5" / "Away +0.5" / or "-0.5"
+    const odd = Number(v?.odd);
+    if (!Number.isFinite(odd)) continue;
+
+    // extract handicap line like -0.25, +0.5
     const m = value.match(/([+-]?\d+(?:\.\d+)?)/);
     const line = m ? m[1] : '';
     if (!line) continue;
-    const arr = lines.get(line) || [];
-    arr.push(v);
-    lines.set(line, arr);
+
+    const arr = byLine.get(line) || [];
+    arr.push({ value, odd });
+    byLine.set(line, arr);
   }
-  const bestLine = [...lines.keys()][0];
-  if (!bestLine) return null;
 
-  const pack = lines.get(bestLine) || [];
-  // try pick two odds
-  const odds = pack
-    .map((v) => ({ name: String(v?.value || ''), odd: Number(v?.odd) }))
-    .filter((x) => Number.isFinite(x.odd));
+  // pick the first line that has >=2 outcomes
+  const entries = [...byLine.entries()]
+    .map(([line, arr]) => ({ line, arr }))
+    .filter((x) => x.arr.length >= 2);
+  const best = entries[0];
+  if (!best) return null;
 
-  return { bookmaker: bm?.name, betName: bet?.name, line: bestLine, odds };
+  const homeKey = meta.home.toLowerCase();
+  const awayKey = meta.away.toLowerCase();
+
+  // Try assign sides
+  const findSide = (s: string) => {
+    const t = s.toLowerCase();
+    if (t.includes('home') || t.includes(homeKey)) return 'home';
+    if (t.includes('away') || t.includes(awayKey)) return 'away';
+    return null;
+  };
+
+  let homeOdd: number | null = null;
+  let awayOdd: number | null = null;
+  for (const o of best.arr) {
+    const side = findSide(o.value);
+    if (side === 'home') homeOdd = o.odd;
+    else if (side === 'away') awayOdd = o.odd;
+  }
+  // fallback: just take first two
+  if (!homeOdd || !awayOdd) {
+    homeOdd = best.arr[0]?.odd ?? null;
+    awayOdd = best.arr[1]?.odd ?? null;
+  }
+
+  const implied = homeOdd && awayOdd ? impliedNoVig(homeOdd, awayOdd) : null;
+
+  return {
+    bookmaker: bm?.name,
+    betName: bet?.name,
+    line: best.line,
+    homeOdd,
+    awayOdd,
+    implied, // {pA(home), pB(away), overround}
+    outcomes: best.arr,
+  };
 }
 
 export const onRequestPost: PagesFunction = async (context) => {
@@ -146,7 +189,7 @@ export const onRequestPost: PagesFunction = async (context) => {
   const jOdds = await rOdds.json();
   if (!rOdds.ok) return json({ ok: false, error: 'api-sports odds error', detail: jOdds }, { status: 502 });
 
-  const ah = pickAsianHandicapFromApiSportsOdds(jOdds);
+  const ah = pickAsianHandicapFromApiSportsOdds(jOdds, meta);
 
   const createdAt = new Date().toISOString();
   await db

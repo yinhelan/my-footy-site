@@ -52,7 +52,7 @@ const season = Astro.url.searchParams.get('season') ?? '';
 
   <div class="card" style="margin-top:1rem">
     <h2 style="margin-top:0">亚盘（API-Sports）</h2>
-    <div class="note">当前版本：先存“原始解析结果”到 D1，后续再补赢盘概率/大小球/相似比赛。</div>
+    <div class="note">当前版本：先做让球盘（亚盘）快照 + 去水后的赢盘概率（市场隐含概率）。趋势图/大小球/相似比赛下一步补。</div>
     <div class="mono" id="ah"></div>
   </div>
 
@@ -101,7 +101,19 @@ const season = Astro.url.searchParams.get('season') ?? '';
       const r=await fetch(u, {method:'POST'});
       const j=await r.json();
       if(!r.ok){ set($('ah'), `error: ${r.status}\n`+jfmt(j)); return; }
-      set($('ah'), jfmt(j.ah || j));
+      const ah = j.ah;
+      if (!ah) {
+        set($('ah'), jfmt(j));
+        return;
+      }
+      const lines = [
+        `bookmaker: ${ah.bookmaker || ''}`,
+        `bet: ${ah.betName || ''}`,
+        `line: ${ah.line || ''}`,
+        `homeOdd: ${ah.homeOdd ?? ''}   awayOdd: ${ah.awayOdd ?? ''}`,
+        ah.implied ? `no-vig p(home): ${(ah.implied.pA*100).toFixed(2)}%  p(away): ${(ah.implied.pB*100).toFixed(2)}%  overround: ${(ah.implied.overround*100).toFixed(2)}%` : '',
+      ].filter(Boolean).join('\n');
+      set($('ah'), lines + '\n\n' + jfmt(ah.outcomes || []));
     }
 
     async function listSnapshots(){
