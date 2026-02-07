@@ -84,7 +84,6 @@ function pickAsianHandicapFromApiSportsOdds(payload: any, meta: { home: string; 
     const odd = Number(v?.odd);
     if (!Number.isFinite(odd)) continue;
 
-    // extract handicap line like -0.25, +0.5
     const m = value.match(/([+-]?\d+(?:\.\d+)?)/);
     const line = m ? m[1] : '';
     if (!line) continue;
@@ -94,7 +93,6 @@ function pickAsianHandicapFromApiSportsOdds(payload: any, meta: { home: string; 
     byLine.set(line, arr);
   }
 
-  // pick the first line that has >=2 outcomes
   const entries = [...byLine.entries()]
     .map(([line, arr]) => ({ line, arr }))
     .filter((x) => x.arr.length >= 2);
@@ -104,7 +102,6 @@ function pickAsianHandicapFromApiSportsOdds(payload: any, meta: { home: string; 
   const homeKey = meta.home.toLowerCase();
   const awayKey = meta.away.toLowerCase();
 
-  // Try assign sides
   const findSide = (s: string) => {
     const t = s.toLowerCase();
     if (t.includes('home') || t.includes(homeKey)) return 'home';
@@ -119,7 +116,6 @@ function pickAsianHandicapFromApiSportsOdds(payload: any, meta: { home: string; 
     if (side === 'home') homeOdd = o.odd;
     else if (side === 'away') awayOdd = o.odd;
   }
-  // fallback: just take first two
   if (!homeOdd || !awayOdd) {
     homeOdd = best.arr[0]?.odd ?? null;
     awayOdd = best.arr[1]?.odd ?? null;
@@ -133,7 +129,7 @@ function pickAsianHandicapFromApiSportsOdds(payload: any, meta: { home: string; 
     line: best.line,
     homeOdd,
     awayOdd,
-    implied, // {pA(home), pB(away), overround}
+    implied,
     outcomes: best.arr,
   };
 }
@@ -153,18 +149,37 @@ export const onRequestPost: PagesFunction = async (context) => {
 
   const origin = new URL(context.request.url).origin;
 
-  // 1) load match meta from football-data
-  const uMatch = new URL('/api/football-data/match', origin);
-  uMatch.searchParams.set('id', matchId);
-  const rMatch = await fetch(uMatch);
-  const jMatch = await rMatch.json();
-  if (!rMatch.ok) return json({ ok: false, error: 'football-data match error', detail: jMatch }, { status: 502 });
-
-  const meta = {
-    utcDate: String(jMatch?.utcDate || ''),
-    home: String(jMatch?.homeTeam?.name || ''),
-    away: String(jMatch?.awayTeam?.name || ''),
+  // 1) load match meta
+  const metaFromQuery = {
+    utcDate: url.searchParams.get('utcDate') || '',
+    home: url.searchParams.get('home') || '',
+    away: url.searchParams.get('away') || '',
   };
+
+  let meta = metaFromQuery;
+  if (!(meta.utcDate && meta.home && meta.away)) {
+    // fallback to football-data single match endpoint
+    const uMatch = new URL('/api/football-data/match', origin);
+    uMatch.searchParams.set('id', matchId);
+    const rMatch = await fetch(uMatch);
+    const jMatch = await rMatch.json();
+    if (!rMatch.ok) {
+      return json(
+        {
+          ok: false,
+          error: 'football-data match error (pass utcDate/home/away to bypass)',
+          detail: jMatch,
+        },
+        { status: 502 }
+      );
+    }
+
+    meta = {
+      utcDate: String(jMatch?.utcDate || ''),
+      home: String(jMatch?.homeTeam?.name || ''),
+      away: String(jMatch?.awayTeam?.name || ''),
+    };
+  }
 
   const LEAGUE_MAP: Record<string, string> = {
     epl: '39',
@@ -180,7 +195,7 @@ export const onRequestPost: PagesFunction = async (context) => {
   const fixtureId = await apiSportsFindFixture({ origin, leagueId, season, ...meta });
   if (!fixtureId) return json({ ok: false, error: 'api-sports fixture not found', meta }, { status: 404 });
 
-  // 3) fetch odds (all bets) then parse asian handicap
+  // 3) fetch odds then parse asian handicap
   const uOdds = new URL('/api/api-sports/odds', origin);
   uOdds.searchParams.set('fixture', String(fixtureId));
   if (bookmakerId && /^\d+$/.test(bookmakerId)) uOdds.searchParams.set('bookmaker', bookmakerId);
@@ -200,8 +215,8 @@ export const onRequestPost: PagesFunction = async (context) => {
           payload_json
         ) VALUES (?, ?, 'api-sports', ?, ?, ?, ?, ?);`
     )
-    .bind(matchId, createdAt, leagueKey, season, String(fixtureId), bookmakerId || null, JSON.stringify({ ah }))
+    .bind(matchId, createdAt, leagueKey, season, String(fixtureId), bookmakerId || null, JSON.stringify({ ah, meta }))
     .run();
 
-  return json({ ok: true, matchId, leagueKey, season, fixtureId, ah, createdAt });
+  return json({ ok: true, matchId, leagueKey, season, fixtureId, meta, ah, createdAt });
 };
