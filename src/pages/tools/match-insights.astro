@@ -37,6 +37,14 @@ const jsonLd = {
         </select>
         <label>Season</label><input id="season" inputmode="numeric" value="2024"/>
         <label>Date（YYYY-MM-DD）</label><input id="date" type="date" />
+        <label>Bookmaker（可选）</label>
+        <select id="bookmaker" style="width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem">
+          <option value="">(auto)</option>
+          <option value="8">Bet365 (8)</option>
+          <option value="11">1xBet (11)</option>
+          <option value="6">Bwin (6)</option>
+        </select>
+        <small class="note">不填 bookmaker 时，API-Sports 会返回可用庄家列表；我们会在响应里自动找 1X2。</small>
         <div style="margin-top:.8rem;display:flex;gap:.6rem;flex-wrap:wrap">
           <button id="loadFixtures" type="button">Load fixtures</button>
           <button id="loadOdds" type="button">Load odds (1X2)</button>
@@ -110,6 +118,9 @@ const jsonLd = {
       const r = await fetch(u);
       const j = await r.json();
       if (!r.ok) { setStatus(`Fixtures error: ${r.status} ${JSON.stringify(j)}`); return; }
+      if (j?.errors && Object.keys(j.errors).length){
+        setStatus('Fixtures warning: ' + JSON.stringify(j.errors));
+      }
 
       const list = (j?.response || []).map((fx)=>{
         const id = fx?.fixture?.id;
@@ -163,8 +174,8 @@ const jsonLd = {
 
       const u = new URL('/api/api-sports/odds', window.location.origin);
       u.searchParams.set('fixture', fixture);
-      // Optional: set bookmaker=8 (Bet365) for consistency; leave open to whatever is available.
-      // u.searchParams.set('bookmaker','8');
+      const bm = $('bookmaker')?.value;
+      if (bm) u.searchParams.set('bookmaker', bm);
 
       const r = await fetch(u);
       const j = await r.json();
