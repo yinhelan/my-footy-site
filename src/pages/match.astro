@@ -1,0 +1,128 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+const title = 'Match · Footy Analytics';
+const jsonLd = {"@context":"https://schema.org","@type":"WebPage","name":"Match","url":Astro.request.url};
+const fid = Astro.url.searchParams.get('fid') ?? '';
+const league = Astro.url.searchParams.get('league') ?? 'epl';
+const season = Astro.url.searchParams.get('season') ?? '';
+---
+<AppLayout title={title} description="比赛详情：亚盘水位/赢盘概率/相似比赛（迭代中）" jsonLd={jsonLd} active="home">
+  <style>
+    .card{border:1px solid #eee;border-radius:12px;padding:1rem}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    input,select{width:100%;padding:.55rem .7rem;border:1px solid #ddd;border-radius:.6rem}
+    button{padding:.55rem .8rem;border:1px solid #ddd;border-radius:.6rem;background:#fafafa;cursor:pointer}
+    .mono{font-variant-numeric:tabular-nums;white-space:pre-wrap}
+    .note{color:#666}
+    table{border-collapse:collapse;width:100%} th,td{border-bottom:1px solid #eee;padding:.5rem;text-align:left}
+  </style>
+
+  <h1>Match detail</h1>
+
+  <div class="card grid">
+    <div>
+      <label class="note">fid（football-data matchId）</label>
+      <input id="fid" value={fid} placeholder="例如：1234567" />
+    </div>
+    <div>
+      <label class="note">League key（用于 API-Sports 映射）</label>
+      <select id="league">
+        <option value="epl" selected={league==='epl'}>epl 英超</option>
+        <option value="laliga" selected={league==='laliga'}>laliga 西甲</option>
+        <option value="seriea" selected={league==='seriea'}>seriea 意甲</option>
+        <option value="bundesliga" selected={league==='bundesliga'}>bundesliga 德甲</option>
+        <option value="ligue1" selected={league==='ligue1'}>ligue1 法甲</option>
+      </select>
+    </div>
+    <div>
+      <label class="note">API-Sports season（默认 2024）</label>
+      <input id="season" value={season} placeholder="例如：2024" />
+    </div>
+    <div style="display:flex;gap:.6rem;align-items:end;flex-wrap:wrap">
+      <button id="loadMeta">加载比赛信息</button>
+      <button id="snap">抓取亚盘快照</button>
+      <button id="list">查看历史快照</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h2 style="margin-top:0">比赛信息</h2>
+    <div class="mono" id="meta"></div>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h2 style="margin-top:0">亚盘（API-Sports）</h2>
+    <div class="note">当前版本：先存“原始解析结果”到 D1，后续再补赢盘概率/大小球/相似比赛。</div>
+    <div class="mono" id="ah"></div>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h2 style="margin-top:0">快照列表</h2>
+    <table>
+      <thead><tr><th>time</th><th>source</th><th>league</th><th>season</th><th>fixture</th><th>bookmaker</th></tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    const $ = (id)=>document.getElementById(id);
+    function set(el, s){ el.textContent = s || ''; }
+    function jfmt(x){ return JSON.stringify(x, null, 2); }
+
+    async function loadMeta(){
+      const id=String($('fid').value||'').trim();
+      if(!id) return alert('请输入 fid(matchId)');
+      const u=new URL('/api/football-data/match', location.origin);
+      u.searchParams.set('id', id);
+      const r=await fetch(u);
+      const j=await r.json();
+      if(!r.ok){ set($('meta'), `error: ${r.status}\n`+jfmt(j)); return; }
+      const line=[
+        `id: ${id}`,
+        `utcDate: ${j.utcDate}`,
+        `competition: ${j.competition?.code} ${j.competition?.name}`,
+        `home: ${j.homeTeam?.name}`,
+        `away: ${j.awayTeam?.name}`,
+        `status: ${j.status}`,
+      ].join('\n');
+      set($('meta'), line);
+      return j;
+    }
+
+    async function snapshotAH(){
+      const id=String($('fid').value||'').trim();
+      if(!id) return alert('请输入 fid(matchId)');
+      const league=$('league').value;
+      const season=String($('season').value||'').trim();
+      const u=new URL('/api/track/snapshot', location.origin);
+      u.searchParams.set('matchId', id);
+      u.searchParams.set('leagueKey', league);
+      if(/^\d{4}$/.test(season)) u.searchParams.set('season', season);
+      const r=await fetch(u, {method:'POST'});
+      const j=await r.json();
+      if(!r.ok){ set($('ah'), `error: ${r.status}\n`+jfmt(j)); return; }
+      set($('ah'), jfmt(j.ah || j));
+    }
+
+    async function listSnapshots(){
+      const id=String($('fid').value||'').trim();
+      if(!id) return alert('请输入 fid(matchId)');
+      const u=new URL('/api/track/snapshots', location.origin);
+      u.searchParams.set('matchId', id);
+      const r=await fetch(u);
+      const j=await r.json();
+      if(!r.ok){ $('tb').innerHTML = `<tr><td colspan="6">error: ${r.status} ${jfmt(j)}</td></tr>`; return; }
+      const rows=j.rows||[];
+      $('tb').innerHTML = rows.map(x=>{
+        return `<tr><td>${x.created_at}</td><td>${x.source}</td><td>${x.league_key||''}</td><td>${x.season||''}</td><td>${x.api_fixture_id||''}</td><td>${x.bookmaker_id||''}</td></tr>`;
+      }).join('');
+    }
+
+    $('loadMeta').addEventListener('click', ()=>loadMeta().catch(e=>set($('meta'), String(e))));
+    $('snap').addEventListener('click', ()=>snapshotAH().catch(e=>set($('ah'), String(e))));
+    $('list').addEventListener('click', ()=>listSnapshots().catch(e=>$('tb').innerHTML=`<tr><td colspan="6">${String(e)}</td></tr>`));
+
+    // auto-load if fid present
+    if(String($('fid').value||'').trim()) loadMeta().catch(()=>{});
+  </script>
+</AppLayout>

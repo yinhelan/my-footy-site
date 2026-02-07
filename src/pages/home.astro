@@ -1,0 +1,57 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+const title = 'Home · Footy Analytics';
+const jsonLd = {"@context":"https://schema.org","@type":"WebSite","name":"Footy Analytics","url":Astro.request.url};
+---
+<AppLayout title={title} description="输入 fid(matchId) 查看比赛详情" jsonLd={jsonLd} active="home">
+  <style>
+    .card{border:1px solid #eee;border-radius:12px;padding:1rem}
+    input{width:100%;padding:.55rem .7rem;border:1px solid #ddd;border-radius:.6rem}
+    button{padding:.55rem .8rem;border:1px solid #ddd;border-radius:.6rem;background:#fafafa;cursor:pointer}
+    .row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+    .note{color:#666}
+  </style>
+
+  <h1>足球赛事预测（MVP）</h1>
+  <div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:220px">
+        <label class="note">fid（默认=football-data matchId）</label>
+        <input id="fid" placeholder="例如：1234567" />
+      </div>
+      <div style="min-width:120px">
+        <label class="note">League</label>
+        <select id="league" style="width:100%;padding:.55rem .7rem;border:1px solid #ddd;border-radius:.6rem">
+          <option value="epl">英超</option>
+          <option value="laliga">西甲</option>
+          <option value="seriea">意甲</option>
+          <option value="bundesliga">德甲</option>
+          <option value="ligue1">法甲</option>
+        </select>
+      </div>
+      <div style="min-width:120px">
+        <label class="note">Season(API-Sports)</label>
+        <input id="season" placeholder="默认2024" />
+      </div>
+      <div style="align-self:end">
+        <button id="go">查看比赛</button>
+      </div>
+    </div>
+    <div class="note" style="margin-top:.6rem">说明：我们用 football-data 获取比赛信息；用 API-Sports 获取亚盘/大小球（需要 D1 才能记录趋势）。</div>
+  </div>
+
+  <script type="module">
+    const $=(id)=>document.getElementById(id);
+    $('go').addEventListener('click',()=>{
+      const fid=String($('fid').value||'').trim();
+      if(!fid){ alert('请输入 fid(matchId)'); return; }
+      const league=$('league').value;
+      const season=String($('season').value||'').trim();
+      const u=new URL('/match', location.origin);
+      u.searchParams.set('fid', fid);
+      u.searchParams.set('league', league);
+      if(/^\d{4}$/.test(season)) u.searchParams.set('season', season);
+      location.href=u.toString();
+    });
+  </script>
+</AppLayout>
