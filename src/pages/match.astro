@@ -55,8 +55,8 @@ const season = Astro.url.searchParams.get('season') ?? '';
   </div>
 
   <div class="card" style="margin-top:1rem">
-    <h2 style="margin-top:0">亚盘（API-Sports）</h2>
-    <div class="note">当前版本：先做让球盘（亚盘）快照 + 去水后的赢盘概率（市场隐含概率）。趋势图/大小球/相似比赛下一步补。</div>
+    <h2 style="margin-top:0">让球盘 Spreads（The Odds API）</h2>
+    <div class="note">当前版本：抓取 spreads(让球) 快照 + 去水后的赢盘概率（市场隐含概率）。默认 bookmaker=Pinnacle。趋势图/大小球/相似比赛下一步补。</div>
     <div class="mono" id="ah"></div>
   </div>
 
@@ -113,16 +113,13 @@ const season = Astro.url.searchParams.get('season') ?? '';
       const id=String($('fid').value||'').trim();
       if(!id) return alert('请输入 fid(matchId)');
       const league=$('league').value;
-      const season=String($('season').value||'').trim();
 
-      // Try to load meta from matches list first (avoids restricted single-match endpoint)
       const meta = await loadMeta();
       if(!meta) return;
 
-      const u=new URL('/api/track/snapshot', location.origin);
+      const u=new URL('/api/track/snapshot_spreads', location.origin);
       u.searchParams.set('matchId', id);
       u.searchParams.set('leagueKey', league);
-      if(/^\d{4}$/.test(season)) u.searchParams.set('season', season);
       u.searchParams.set('utcDate', meta.utcDate);
       u.searchParams.set('home', meta.homeTeam?.name || '');
       u.searchParams.set('away', meta.awayTeam?.name || '');
@@ -131,16 +128,19 @@ const season = Astro.url.searchParams.get('season') ?? '';
       const j=await r.json();
       if(!r.ok){ set($('ah'), `error: ${r.status}\n`+jfmt(j)); return; }
 
-      const ah = j.ah;
-      if (!ah) { set($('ah'), jfmt(j)); return; }
+      const sp = j.spreads;
+      if (!sp) { set($('ah'), jfmt(j)); return; }
+
       const lines = [
-        `bookmaker: ${ah.bookmaker || ''}`,
-        `bet: ${ah.betName || ''}`,
-        `line: ${ah.line || ''}`,
-        `homeOdd: ${ah.homeOdd ?? ''}   awayOdd: ${ah.awayOdd ?? ''}`,
-        ah.implied ? `no-vig p(home): ${(ah.implied.pA*100).toFixed(2)}%  p(away): ${(ah.implied.pB*100).toFixed(2)}%  overround: ${(ah.implied.overround*100).toFixed(2)}%` : '',
+        `bookmaker: ${sp.bookmaker || ''} (${sp.key||''})`,
+        `market: spreads`,
+        `time: ${sp.event?.commence_time || ''}`,
+        `home: ${sp.home?.team}  point ${sp.home?.point}  price ${sp.home?.price}`,
+        `away: ${sp.away?.team}  point ${sp.away?.point}  price ${sp.away?.price}`,
+        sp.implied ? `no-vig p(home): ${(sp.implied.pA*100).toFixed(2)}%  p(away): ${(sp.implied.pB*100).toFixed(2)}%  overround: ${(sp.implied.overround*100).toFixed(2)}%` : '',
       ].filter(Boolean).join('\n');
-      set($('ah'), lines + '\n\n' + jfmt(ah.outcomes || []));
+
+      set($('ah'), lines + '\n\n' + jfmt(sp));
     }
 
     async function listSnapshots(){
