@@ -27,27 +27,26 @@ const jsonLd = {
     <h2 style="margin:0 0 .6rem">Real data（fixtures + odds）</h2>
     <div class="grid" style="grid-template-columns:1fr 1fr">
       <div>
-        <label>League（API-Sports league id）</label>
+        <label>League</label>
         <select id="league" style="width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem">
-          <option value="39">英超 Premier League (39)</option>
-          <option value="140">西甲 La Liga (140)</option>
-          <option value="135">意甲 Serie A (135)</option>
-          <option value="78">德甲 Bundesliga (78)</option>
-          <option value="61">法甲 Ligue 1 (61)</option>
+          <option value="epl">英超 Premier League</option>
+          <option value="laliga">西甲 La Liga</option>
+          <option value="seriea">意甲 Serie A</option>
+          <option value="bundesliga">德甲 Bundesliga</option>
+          <option value="ligue1">法甲 Ligue 1</option>
         </select>
-        <label>Season</label><input id="season" inputmode="numeric" value="2024"/>
         <label>Date（YYYY-MM-DD）</label><input id="date" type="date" />
-        <label>Bookmaker（可选）</label>
-        <select id="bookmaker" style="width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem">
-          <option value="">(auto)</option>
-          <option value="8">Bet365 (8)</option>
-          <option value="11">1xBet (11)</option>
-          <option value="6">Bwin (6)</option>
+        <label>Odds source</label>
+        <select id="oddsSource" style="width:100%;padding:.5rem .6rem;border:1px solid #ddd;border-radius:.5rem">
+          <option value="odds-api">the-odds-api (h2h)</option>
+          <option value="api-sports">API-Sports (1X2)</option>
         </select>
-        <small class="note">不填 bookmaker 时，API-Sports 会返回可用庄家列表；我们会在响应里自动找 1X2。</small>
+        <label>Bookmaker（可选）</label>
+        <input id="bookmaker" placeholder="例如：bet365 或 api-sports bookmaker id" />
+        <small class="note">赛程：football-data.org；赔率：默认 the-odds-api。Bookmaker 可留空。</small>
         <div style="margin-top:.8rem;display:flex;gap:.6rem;flex-wrap:wrap">
           <button id="loadFixtures" type="button">Load fixtures</button>
-          <button id="loadOdds" type="button">Load odds (1X2)</button>
+          <button id="loadOdds" type="button">Load odds</button>
         </div>
       </div>
       <div>
@@ -103,33 +102,41 @@ const jsonLd = {
     }
 
     async function loadFixtures(){
-      const league = $('league').value;
-      const season = $('season').value;
+      const leagueKey = $('league').value;
       const date = $('date').value;
       setStatus('Loading fixtures...');
       $('fixture').innerHTML = '';
 
-      const u = new URL('/api/api-sports/fixtures', window.location.origin);
-      u.searchParams.set('league', league);
-      u.searchParams.set('season', season);
-      u.searchParams.set('date', date);
-      u.searchParams.set('timezone', 'Asia/Shanghai');
+      const LEAGUES = {
+        epl: { footballData: 'PL', oddsApiSport: 'soccer_epl' },
+        laliga: { footballData: 'PD', oddsApiSport: 'soccer_spain_la_liga' },
+        seriea: { footballData: 'SA', oddsApiSport: 'soccer_italy_serie_a' },
+        bundesliga: { footballData: 'BL1', oddsApiSport: 'soccer_germany_bundesliga' },
+        ligue1: { footballData: 'FL1', oddsApiSport: 'soccer_france_ligue_one' },
+      };
+      const cfg = LEAGUES[leagueKey];
+      if (!cfg) { setStatus('Unknown league'); return; }
+
+      const u = new URL('/api/football-data/matches', window.location.origin);
+      u.searchParams.set('competition', cfg.footballData);
+      u.searchParams.set('dateFrom', date);
+      u.searchParams.set('dateTo', date);
 
       const r = await fetch(u);
       const j = await r.json();
       if (!r.ok) { setStatus(`Fixtures error: ${r.status} ${JSON.stringify(j)}`); return; }
-      if (j?.errors && Object.keys(j.errors).length){
-        setStatus('Fixtures warning: ' + JSON.stringify(j.errors));
-      }
 
-      const list = (j?.response || []).map((fx)=>{
-        const id = fx?.fixture?.id;
-        const dt = fx?.fixture?.date;
-        const home = fx?.teams?.home?.name;
-        const away = fx?.teams?.away?.name;
-        const status = fx?.fixture?.status?.short;
-        return { id, label: `${home} vs ${away} · ${dt} · ${status}` };
+      const list = (j?.matches || []).map((m)=>{
+        const id = m?.id;
+        const dt = m?.utcDate;
+        const home = m?.homeTeam?.name;
+        const away = m?.awayTeam?.name;
+        const status = m?.status;
+        return { id, label: `${home} vs ${away} · ${dt} · ${status}`, meta: { utcDate: dt, home, away, leagueKey } };
       }).filter(x=>x.id);
+
+      // store meta for odds matching
+      window.__fixturesMeta = Object.fromEntries(list.map(x=>[String(x.id), x.meta]));
 
       if (!list.length){ setStatus('No fixtures found for this date/league/season.'); return; }
 
@@ -144,54 +151,101 @@ const jsonLd = {
       setStatus(`Fixtures loaded: ${list.length}`);
     }
 
-    function pick1x2OddsFromApiSports(payload){
-      // payload shape: { response: [ { bookmakers:[{ bets:[{ name, values:[{ value, odd }] }]}]}] }
-      const resp = payload?.response?.[0];
-      const bms = resp?.bookmakers || [];
-      for (const bm of bms){
-        for (const bet of (bm?.bets || [])){
-          const name = String(bet?.name || '').toLowerCase();
-          if (!name.includes('match winner') && !name.includes('1x2') && !name.includes('胜平负')) continue;
-          const vals = bet?.values || [];
-          const getOdd = (k)=>{
-            const hit = vals.find(v=>String(v?.value||'').toLowerCase()===k);
-            const odd = hit ? Number(hit.odd) : NaN;
-            return Number.isFinite(odd) ? odd : null;
-          };
-          const home = getOdd('home');
-          const draw = getOdd('draw');
-          const away = getOdd('away');
-          if (home && draw && away) return { home, draw, away, bookmaker: bm?.name, betName: bet?.name };
-        }
-      }
-      return null;
+    function normTeam(s){
+      return String(s||'')
+        .toLowerCase()
+        .replace(/\b(fc|cf|sc|afc)\b/g,'')
+        .replace(/[^a-z0-9\u4e00-\u9fa5]+/g,' ')
+        .trim();
+    }
+
+    function pickH2HOddsFromOddsApi(events, meta){
+      // events: array of odds-api events with bookmakers->markets[h2h]
+      const targetHome = normTeam(meta.home);
+      const targetAway = normTeam(meta.away);
+      const targetDate = String(meta.utcDate||'').slice(0,10);
+
+      const candidates = (events||[]).filter(ev=>{
+        const h = normTeam(ev?.home_team);
+        const a = normTeam(ev?.away_team);
+        const d = String(ev?.commence_time||'').slice(0,10);
+        const sameTeams = (h===targetHome && a===targetAway) || (h===targetAway && a===targetHome);
+        return sameTeams && (!targetDate || d===targetDate);
+      });
+      const ev = candidates[0];
+      if (!ev) return null;
+
+      const wantedBook = String($('bookmaker')?.value||'').toLowerCase().trim();
+      const bms = ev.bookmakers || [];
+      const bm = wantedBook ? bms.find(b=>String(b.key||'').toLowerCase()===wantedBook || String(b.title||'').toLowerCase().includes(wantedBook)) : bms[0];
+      if (!bm) return null;
+
+      const mkt = (bm.markets||[]).find(m=>m.key==='h2h');
+      if (!mkt) return null;
+
+      const outs = mkt.outcomes || [];
+      const getPrice = (name)=>{
+        const hit = outs.find(o=>String(o.name||'').toLowerCase()===String(name||'').toLowerCase());
+        const p = hit ? Number(hit.price) : NaN;
+        return Number.isFinite(p) ? p : null;
+      };
+
+      const homeP = getPrice(ev.home_team);
+      const awayP = getPrice(ev.away_team);
+      const drawP = getPrice('Draw') ?? getPrice('draw');
+
+      if (!homeP || !awayP || !drawP) return null;
+      return { home: homeP, draw: drawP, away: awayP, bookmaker: bm.title || bm.key };
     }
 
     async function loadOdds(){
-      const fixture = $('fixture').value;
-      if (!fixture){ setStatus('Pick a fixture first.'); return; }
-      setStatus('Loading odds...');
+      const matchId = $('fixture').value;
+      if (!matchId){ setStatus('Pick a fixture first.'); return; }
+      const meta = window.__fixturesMeta?.[String(matchId)];
+      if (!meta){ setStatus('Missing fixture meta; reload fixtures.'); return; }
 
-      const u = new URL('/api/api-sports/odds', window.location.origin);
-      u.searchParams.set('fixture', fixture);
-      const bm = $('bookmaker')?.value;
-      if (bm) u.searchParams.set('bookmaker', bm);
+      const LEAGUES = {
+        epl: { oddsApiSport: 'soccer_epl' },
+        laliga: { oddsApiSport: 'soccer_spain_la_liga' },
+        seriea: { oddsApiSport: 'soccer_italy_serie_a' },
+        bundesliga: { oddsApiSport: 'soccer_germany_bundesliga' },
+        ligue1: { oddsApiSport: 'soccer_france_ligue_one' },
+      };
+      const cfg = LEAGUES[meta.leagueKey];
+      if (!cfg) { setStatus('Unknown league for odds'); return; }
 
-      const r = await fetch(u);
-      const j = await r.json();
-      if (!r.ok) { setStatus(`Odds error: ${r.status} ${JSON.stringify(j)}`); return; }
+      const oddsSource = $('oddsSource')?.value || 'odds-api';
+      setStatus(`Loading odds (${oddsSource})...`);
 
-      const pick = pick1x2OddsFromApiSports(j);
-      if (!pick){
-        setStatus('Odds loaded but could not find 1X2 (Match Winner) in response. Try another league/date or set bookmaker filter.');
+      if (oddsSource === 'odds-api'){
+        const u = new URL('/api/odds/odds', window.location.origin);
+        u.searchParams.set('sport', cfg.oddsApiSport);
+        u.searchParams.set('regions', 'eu');
+        u.searchParams.set('markets', 'h2h');
+        u.searchParams.set('oddsFormat', 'decimal');
+        u.searchParams.set('dateFormat', 'iso');
+        // optional bookmakers filter (comma-separated keys) could be added later
+
+        const r = await fetch(u);
+        const j = await r.json();
+        if (!r.ok) { setStatus(`Odds error: ${r.status} ${JSON.stringify(j)}`); return; }
+
+        const pick = pickH2HOddsFromOddsApi(j, meta);
+        if (!pick){
+          setStatus('Odds loaded but could not match event or find h2h 1X2. Try another date/league or leave bookmaker empty.');
+          return;
+        }
+
+        $('oh').value = String(pick.home);
+        $('od').value = String(pick.draw);
+        $('oa').value = String(pick.away);
+        setStatus(`Odds OK (${pick.bookmaker}) → filled Market odds.`);
+        calc();
         return;
       }
 
-      $('oh').value = String(pick.home);
-      $('od').value = String(pick.draw);
-      $('oa').value = String(pick.away);
-      setStatus(`Odds OK (${pick.bookmaker || 'bookmaker?'} / ${pick.betName || 'Match Winner'}) → filled Market odds.`);
-      calc();
+      // Fallback: API-Sports odds requires fixture-id mapping; not wired in this path yet.
+      setStatus('API-Sports odds mapping from football-data match → api-sports fixture is not implemented yet. Use the-odds-api for now.');
     }
 
     function calc(){
