@@ -202,8 +202,21 @@ export const onRequestPost: PagesFunction = async (context) => {
   const leagueId = LEAGUE_MAP[String(leagueKey)] || '';
   if (!leagueId) return json({ ok: false, error: 'unknown leagueKey for api-sports' }, { status: 400 });
 
-  const fixtureId = await apiSportsFindFixture({ origin, leagueId, season, ...meta });
-  if (!fixtureId) return json({ ok: false, error: 'api-sports fixture not found', meta }, { status: 404 });
+  const seasonsTried = [] as string[];
+  const candidates = [season, '2024', '2023', '2022'].filter((x, i, a) => /^\d{4}$/.test(x) && a.indexOf(x) === i);
+
+  let fixtureId: number | null = null;
+  let seasonUsed: string | null = null;
+  for (const s of candidates) {
+    seasonsTried.push(s);
+    fixtureId = await apiSportsFindFixture({ origin, leagueId, season: s, ...meta });
+    if (fixtureId) {
+      seasonUsed = s;
+      break;
+    }
+  }
+
+  if (!fixtureId) return json({ ok: false, error: 'api-sports fixture not found', meta, seasonsTried }, { status: 404 });
 
   const uOdds = new URL('/api/api-sports/odds', origin);
   uOdds.searchParams.set('fixture', String(fixtureId));
@@ -224,8 +237,8 @@ export const onRequestPost: PagesFunction = async (context) => {
           payload_json
         ) VALUES (?, ?, 'api-sports', ?, ?, ?, ?, ?);`
     )
-    .bind(matchId, createdAt, leagueKey, season, String(fixtureId), bookmakerId || null, JSON.stringify({ ah, meta }))
+    .bind(matchId, createdAt, leagueKey, seasonUsed || season, String(fixtureId), bookmakerId || null, JSON.stringify({ ah, meta }))
     .run();
 
-  return json({ ok: true, matchId, leagueKey, season, fixtureId, meta, ah, createdAt });
+  return json({ ok: true, matchId, leagueKey, season: seasonUsed || season, seasonsTried, fixtureId, meta, ah, createdAt });
 };

@@ -35,7 +35,11 @@ const season = Astro.url.searchParams.get('season') ?? '';
       </select>
     </div>
     <div>
-      <label class="note">API-Sports season（默认 2024）</label>
+      <label class="note">比赛日期（用于从 matches 列表解析 meta）</label>
+      <input id="date" type="date" />
+    </div>
+    <div>
+      <label class="note">API-Sports season（可不填；会自动回退 2024→2023→2022）</label>
       <input id="season" value={season} placeholder="例如：2024" />
     </div>
     <div style="display:flex;gap:.6rem;align-items:end;flex-wrap:wrap">
@@ -69,24 +73,40 @@ const season = Astro.url.searchParams.get('season') ?? '';
     function set(el, s){ el.textContent = s || ''; }
     function jfmt(x){ return JSON.stringify(x, null, 2); }
 
+    const LEAGUE_COMP = { epl: 'PL', laliga: 'PD', seriea: 'SA', bundesliga: 'BL1', ligue1: 'FL1' };
+    function todayISO(){ const d=new Date(); const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
     async function loadMeta(){
       const id=String($('fid').value||'').trim();
       if(!id) return alert('请输入 fid(matchId)');
-      const u=new URL('/api/football-data/match', location.origin);
-      u.searchParams.set('id', id);
+      const leagueKey=$('league').value;
+      const comp=LEAGUE_COMP[leagueKey];
+      const date=$('date').value || todayISO();
+
+      const u=new URL('/api/football-data/matches', location.origin);
+      u.searchParams.set('competition', comp);
+      u.searchParams.set('dateFrom', date);
+      u.searchParams.set('dateTo', date);
       const r=await fetch(u);
       const j=await r.json();
       if(!r.ok){ set($('meta'), `error: ${r.status}\n`+jfmt(j)); return; }
+
+      const m=(j.matches||[]).find(x=>String(x.id)===String(id));
+      if(!m){
+        set($('meta'), `未在 ${comp} ${date} 的 matches 列表里找到 id=${id}。\n你可以改一下日期再试。`);
+        return;
+      }
+
       const line=[
         `id: ${id}`,
-        `utcDate: ${j.utcDate}`,
-        `competition: ${j.competition?.code} ${j.competition?.name}`,
-        `home: ${j.homeTeam?.name}`,
-        `away: ${j.awayTeam?.name}`,
-        `status: ${j.status}`,
+        `utcDate: ${m.utcDate}`,
+        `competition: ${m.competition?.code} ${m.competition?.name}`,
+        `home: ${m.homeTeam?.name}`,
+        `away: ${m.awayTeam?.name}`,
+        `status: ${m.status}`,
       ].join('\n');
       set($('meta'), line);
-      return j;
+      return m;
     }
 
     async function snapshotAH(){
@@ -94,18 +114,25 @@ const season = Astro.url.searchParams.get('season') ?? '';
       if(!id) return alert('请输入 fid(matchId)');
       const league=$('league').value;
       const season=String($('season').value||'').trim();
+
+      // Try to load meta from matches list first (avoids restricted single-match endpoint)
+      const meta = await loadMeta();
+      if(!meta) return;
+
       const u=new URL('/api/track/snapshot', location.origin);
       u.searchParams.set('matchId', id);
       u.searchParams.set('leagueKey', league);
       if(/^\d{4}$/.test(season)) u.searchParams.set('season', season);
+      u.searchParams.set('utcDate', meta.utcDate);
+      u.searchParams.set('home', meta.homeTeam?.name || '');
+      u.searchParams.set('away', meta.awayTeam?.name || '');
+
       const r=await fetch(u, {method:'POST'});
       const j=await r.json();
       if(!r.ok){ set($('ah'), `error: ${r.status}\n`+jfmt(j)); return; }
+
       const ah = j.ah;
-      if (!ah) {
-        set($('ah'), jfmt(j));
-        return;
-      }
+      if (!ah) { set($('ah'), jfmt(j)); return; }
       const lines = [
         `bookmaker: ${ah.bookmaker || ''}`,
         `bet: ${ah.betName || ''}`,
@@ -133,6 +160,9 @@ const season = Astro.url.searchParams.get('season') ?? '';
     $('loadMeta').addEventListener('click', ()=>loadMeta().catch(e=>set($('meta'), String(e))));
     $('snap').addEventListener('click', ()=>snapshotAH().catch(e=>set($('ah'), String(e))));
     $('list').addEventListener('click', ()=>listSnapshots().catch(e=>$('tb').innerHTML=`<tr><td colspan="6">${String(e)}</td></tr>`));
+
+    // init
+    $('date').value = $('date').value || todayISO();
 
     // auto-load if fid present
     if(String($('fid').value||'').trim()) loadMeta().catch(()=>{});
