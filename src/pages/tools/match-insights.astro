@@ -42,8 +42,10 @@ const jsonLd = {
           <option value="api-sports">API-Sports (1X2)</option>
         </select>
         <label>Bookmaker（可选）</label>
-        <input id="bookmaker" placeholder="例如：bet365 或 api-sports bookmaker id" />
-        <small class="note">赛程：football-data.org；赔率：默认 the-odds-api。Bookmaker 可留空。</small>
+        <input id="bookmaker" placeholder="odds-api: bet365 等；api-sports: bookmaker id(数字)" />
+        <label>API-Sports season（可选，默认 2024）</label>
+        <input id="apiSeason" placeholder="例如：2024" />
+        <small class="note">赛程：football-data.org；赔率：默认 the-odds-api。API-Sports free plan 往往只支持到 2024 赛季。</small>
         <div style="margin-top:.8rem;display:flex;gap:.6rem;flex-wrap:wrap">
           <button id="loadFixtures" type="button">Load fixtures</button>
           <button id="loadOdds" type="button">Load odds</button>
@@ -254,6 +256,26 @@ const jsonLd = {
     return { home: homeP, draw: drawP, away: awayP, bookmaker: bm.title || bm.key };
   }
 
+  function normalizeTeamMore(s) {
+    return normTeam(s)
+      .replace(/manchester united/g, 'man utd')
+      .replace(/manchester city/g, 'man city')
+      .replace(/tottenham hotspur/g, 'tottenham')
+      .replace(/wolverhampton wanderers/g, 'wolves')
+      .replace(/internazionale/g, 'inter')
+      .replace(/atalanta bc/g, 'atalanta')
+      .replace(/borussia dortmund/g, 'dortmund')
+      .replace(/bayern munchen/g, 'bayern')
+      .replace(/paris saint germain/g, 'psg');
+  }
+
+  function timeDistanceMinutes(aIso, bIso) {
+    const a = Date.parse(aIso);
+    const b = Date.parse(bIso);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return Infinity;
+    return Math.abs(a - b) / 60000;
+  }
+
   async function apiSportsFindFixture(meta, season = '2024') {
     const cfg = LEAGUES[meta.leagueKey];
     if (!cfg?.apiSportsLeague) throw new Error('api-sports league mapping missing');
@@ -270,16 +292,24 @@ const jsonLd = {
     if (!r.ok) throw new Error('API-Sports fixtures error: ' + r.status + ' ' + JSON.stringify(j));
 
     const list = j?.response || [];
-    const th = normTeam(meta.home);
-    const ta = normTeam(meta.away);
+    const th = normalizeTeamMore(meta.home);
+    const ta = normalizeTeamMore(meta.away);
+    const targetTime = String(meta.utcDate || '');
 
-    const hit = list.find((x) => {
-      const h = normTeam(x?.teams?.home?.name);
-      const a = normTeam(x?.teams?.away?.name);
-      return (h === th && a === ta) || (h === ta && a === th);
-    });
+    // prefer exact team match + closest kickoff time (within 12h)
+    const candidates = list
+      .map((x) => {
+        const h = normalizeTeamMore(x?.teams?.home?.name);
+        const a = normalizeTeamMore(x?.teams?.away?.name);
+        const sameTeams = (h === th && a === ta) || (h === ta && a === th);
+        const mins = timeDistanceMinutes(String(x?.fixture?.date || ''), targetTime);
+        return { x, sameTeams, mins };
+      })
+      .filter((c) => c.sameTeams)
+      .sort((p, q) => p.mins - q.mins);
 
-    return hit?.fixture?.id || null;
+    const hit = candidates.find((c) => c.mins <= 12 * 60) || candidates[0];
+    return hit?.x?.fixture?.id || null;
   }
 
   function pick1x2FromApiSportsOdds(payload, meta) {
@@ -387,7 +417,8 @@ const jsonLd = {
 
     if (oddsSource === 'api-sports') {
       // NOTE: API-Sports free plan commonly supports up to season 2024.
-      const season = '2024';
+      const seasonInput = String($('apiSeason')?.value || '').trim();
+      const season = /^\d{4}$/.test(seasonInput) ? seasonInput : '2024';
       const fixtureId = await apiSportsFindFixture(meta, season);
       if (!fixtureId) {
         return void setStatus('API-Sports: 找不到对应 fixture（可能是球队名不一致/该日期无数据/赛季不支持）。');
