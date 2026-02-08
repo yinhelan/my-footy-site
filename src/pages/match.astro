@@ -66,12 +66,94 @@ const season = Astro.url.searchParams.get('season') ?? '';
       <thead><tr><th>time</th><th>source</th><th>league</th><th>bookmaker</th><th>line</th><th>home</th><th>away</th></tr></thead>
       <tbody id="tb"></tbody>
     </table>
+  
+
+  <div class="card" style="margin-top:1rem">
+    <h2 style="margin-top:0">盘口趋势（point）</h2>
+    <div class="note">从 D1 快照序列绘制 spreads 的 point（让球盘）随时间变化（越负=让得越深）。</div>
+    <div id="chartWrap" style="width:100%;overflow:auto">
+      <svg id="chart" width="720" height="220" viewBox="0 0 720 220" style="border:1px solid #eee;border-radius:12px;background:#fff"></svg>
+    </div>
+    <div class="note" id="chartHint" style="margin-top:.6rem"></div>
   </div>
+</div>
 
   <script type="module">
     const $ = (id)=>document.getElementById(id);
     function set(el, s){ el.textContent = s || ''; }
     function jfmt(x){ return JSON.stringify(x, null, 2); }
+
+
+    function parseIso(s){ const t=Date.parse(s); return Number.isFinite(t)?t:null; }
+    function fmtTime(iso){ try{ const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }catch{ return iso; } }
+
+    function drawPointChart(rows){
+      const svg=$('chart');
+      const hint=$('chartHint');
+      if(!svg) return;
+
+      const pts = (rows||[]).map(r=>{
+        const t=parseIso(r.created_at);
+        const p=r.spreads && r.spreads.home ? Number(r.spreads.home.point) : NaN;
+        return {t, p, iso:r.created_at};
+      }).filter(x=>x.t && Number.isFinite(x.p)).sort((a,b)=>a.t-b.t);
+
+      if(pts.length<2){
+        svg.innerHTML = `<text x="16" y="30" fill="#666" font-size="14">快照不足（至少需要 2 个点）</text>`;
+        hint.textContent = pts.length===1 ? `当前仅 1 个点：${fmtTime(pts[0].iso)}  point=${pts[0].p}` : '';
+        return;
+      }
+
+      const W=720,H=220,padL=48,padR=16,padT=16,padB=34;
+      const minT=Math.min(...pts.map(x=>x.t));
+      const maxT=Math.max(...pts.map(x=>x.t));
+      let minP=Math.min(...pts.map(x=>x.p));
+      let maxP=Math.max(...pts.map(x=>x.p));
+      if(minP===maxP){ minP-=0.5; maxP+=0.5; }
+
+      const x = (t)=> padL + ( (t-minT) / (maxT-minT) ) * (W-padL-padR);
+      const y = (p)=> padT + ( (maxP-p) / (maxP-minP) ) * (H-padT-padB);
+
+      // grid + axes
+      const gridY = 4;
+      let g='';
+      for(let i=0;i<=gridY;i++){
+        const yy = padT + i*(H-padT-padB)/gridY;
+        const pv = (maxP - i*(maxP-minP)/gridY);
+        g += `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="#f2f2f2"/>`;
+        g += `<text x="${padL-8}" y="${yy+4}" text-anchor="end" fill="#888" font-size="12">${pv.toFixed(2)}</text>`;
+      }
+      g += `<line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#ddd"/>`;
+      g += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#ddd"/>`;
+
+      // step-like path
+      let d='';
+      for(let i=0;i<pts.length;i++){
+        const xi=x(pts[i].t), yi=y(pts[i].p);
+        if(i===0){ d += `M ${xi} ${yi}`; }
+        else{
+          const xPrev=x(pts[i-1].t), yPrev=y(pts[i-1].p);
+          // horizontal then vertical (step)
+          d += ` L ${xi} ${yPrev} L ${xi} ${yi}`;
+        }
+      }
+      const path = `<path d="${d}" fill="none" stroke="#111" stroke-width="2"/>`;
+
+      // points
+      const dots = pts.map(p=>`<circle cx="${x(p.t)}" cy="${y(p.p)}" r="3" fill="#111"/>`).join('');
+
+      // x labels (first/last)
+      const xlab = `
+        <text x="${padL}" y="${H-10}" fill="#888" font-size="12">${fmtTime(new Date(minT).toISOString())}</text>
+        <text x="${W-padR}" y="${H-10}" text-anchor="end" fill="#888" font-size="12">${fmtTime(new Date(maxT).toISOString())}</text>
+      `;
+
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      svg.setAttribute('width', String(Math.max(720, pts.length*40)));
+      svg.innerHTML = g + path + dots + xlab;
+
+      hint.textContent = `point范围：${minP.toFixed(2)} ～ ${maxP.toFixed(2)}；点数：${pts.length}`;
+    }
 
     const LEAGUE_COMP = { epl: 'PL', laliga: 'PD', seriea: 'SA', bundesliga: 'BL1', ligue1: 'FL1' };
     function todayISO(){ const d=new Date(); const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
@@ -152,6 +234,7 @@ const season = Astro.url.searchParams.get('season') ?? '';
       const j=await r.json();
       if(!r.ok){ $('tb').innerHTML = `<tr><td colspan="7">error: ${r.status} ${jfmt(j)}</td></tr>`; return; }
       const rows=j.rows||[];
+      drawPointChart(rows);
       $('tb').innerHTML = rows.map(x=>{
         const sp=x.spreads||null;
         const line=sp? (sp.home?.point ?? '') : '';
